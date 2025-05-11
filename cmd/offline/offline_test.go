@@ -1,6 +1,7 @@
 package offline_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -25,7 +26,7 @@ func TestSaveHeartbeats(t *testing.T) {
 
 	defer offlineQueueFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("config", tmpFile.Name())
@@ -63,7 +64,7 @@ func TestSaveHeartbeats_ExtraHeartbeats(t *testing.T) {
 
 	defer offlineQueueFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/extra_heartbeats.json")
 	require.NoError(t, err)
@@ -98,7 +99,7 @@ func TestSaveHeartbeats_OfflineDisabled(t *testing.T) {
 
 	defer offlineQueueFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("config", tmpFile.Name())

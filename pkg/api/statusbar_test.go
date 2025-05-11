@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -41,7 +42,7 @@ func TestClient_StatusBar(t *testing.T) {
 
 	c := api.NewClient(u)
 
-	s, err := c.Today(t.Context())
+	s, err := c.Today(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, s, testSummary())
@@ -66,7 +67,7 @@ func TestClient_StatusBarWithTimeout(t *testing.T) {
 	opts := []api.Option{api.WithTimeout(20 * time.Millisecond)}
 	c := api.NewClient(u, opts...)
 
-	_, err := c.Today(t.Context())
+	_, err := c.Today(context.Background())
 	require.Error(t, err)
 
 	errMsg := fmt.Sprintf("error %q does not contain string 'Timeout'", err)
@@ -95,7 +96,7 @@ func TestClient_StatusBar_Err(t *testing.T) {
 
 	c := api.NewClient(u)
 
-	_, err := c.Today(t.Context())
+	_, err := c.Today(context.Background())
 
 	var apierr api.Err
 
@@ -117,7 +118,7 @@ func TestClient_StatusBar_ErrAuth(t *testing.T) {
 
 	c := api.NewClient(u)
 
-	_, err := c.Today(t.Context())
+	_, err := c.Today(context.Background())
 
 	var errauth api.ErrAuth
 
@@ -140,7 +141,7 @@ func TestClient_StatusBar_ErrBadRequest(t *testing.T) {
 
 	c := api.NewClient(u)
 
-	_, err := c.Today(t.Context())
+	_, err := c.Today(context.Background())
 
 	var errbadRequest api.ErrBadRequest
 
@@ -151,7 +152,7 @@ func TestClient_StatusBar_ErrBadRequest(t *testing.T) {
 func TestClient_StatusBar_InvalidUrl(t *testing.T) {
 	c := api.NewClient("invalid-url")
 
-	_, err := c.Today(t.Context())
+	_, err := c.Today(context.Background())
 
 	var apierr api.Err
 

@@ -1,6 +1,7 @@
 package regex
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dlclark/regexp2"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestRegexp2Wrap_MatchString(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]bool{
 		"gopher":             false,
@@ -33,7 +34,7 @@ func TestRegexp2Wrap_MatchString(t *testing.T) {
 }
 
 func TestRegexp2Wrap_FindStringSubmatch(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]struct {
 		String   string

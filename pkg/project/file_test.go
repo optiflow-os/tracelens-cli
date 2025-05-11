@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +27,7 @@ func TestFile_Detect_FileExists(t *testing.T) {
 		Filepath: filepath.Join(tmpDir, ".wakatime-project"),
 	}
 
-	result, detected, err := f.Detect(t.Context())
+	result, detected, err := f.Detect(context.Background())
 	require.NoError(t, err)
 
 	expected := project.Result{
@@ -58,7 +59,7 @@ func TestFile_Detect_ParentFolderExists(t *testing.T) {
 		Filepath: dir,
 	}
 
-	result, detected, err := f.Detect(t.Context())
+	result, detected, err := f.Detect(context.Background())
 	require.NoError(t, err)
 
 	expected := project.Result{
@@ -83,7 +84,7 @@ func TestFile_Detect_NoFileFound(t *testing.T) {
 		Filepath: tmpDir,
 	}
 
-	result, detected, err := f.Detect(t.Context())
+	result, detected, err := f.Detect(context.Background())
 	require.NoError(t, err)
 
 	expected := project.Result{}
@@ -102,7 +103,7 @@ func TestFile_Detect_InvalidPath(t *testing.T) {
 		Filepath: tmpFile.Name(),
 	}
 
-	_, detected, err := f.Detect(t.Context())
+	_, detected, err := f.Detect(context.Background())
 	require.NoError(t, err)
 
 	assert.False(t, detected)
@@ -122,7 +123,7 @@ func TestFindFileOrDirectory(t *testing.T) {
 		filepath.Join(tmpDir, ".wakatime-project"),
 	)
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]struct {
 		Filepath string

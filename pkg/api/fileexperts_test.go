@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestClient_FileExperts(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := []int{
 		http.StatusOK,
@@ -133,7 +134,7 @@ func TestClient_FileExperts_Err(t *testing.T) {
 	})
 
 	c := api.NewClient(url)
-	_, err := c.FileExperts(t.Context(), []heartbeat.Heartbeat{
+	_, err := c.FileExperts(context.Background(), []heartbeat.Heartbeat{
 		{
 			APIKey:           "00000000-0000-4000-8000-000000000000",
 			Entity:           "/tmp/main.go",
@@ -162,7 +163,7 @@ func TestClient_FileExperts_ErrAuth(t *testing.T) {
 	})
 
 	c := api.NewClient(url)
-	_, err := c.FileExperts(t.Context(), []heartbeat.Heartbeat{
+	_, err := c.FileExperts(context.Background(), []heartbeat.Heartbeat{
 		{
 			APIKey:           "00000000-0000-4000-8000-000000000000",
 			Entity:           "/tmp/main.go",
@@ -191,7 +192,7 @@ func TestClient_FileExperts_ErrBadRequest(t *testing.T) {
 	})
 
 	c := api.NewClient(url)
-	_, err := c.FileExperts(t.Context(), []heartbeat.Heartbeat{
+	_, err := c.FileExperts(context.Background(), []heartbeat.Heartbeat{
 		{
 			APIKey:           "00000000-0000-4000-8000-000000000000",
 			Entity:           "/tmp/main.go",
@@ -209,7 +210,7 @@ func TestClient_FileExperts_ErrBadRequest(t *testing.T) {
 
 func TestClient_FileExperts_InvalidUrl(t *testing.T) {
 	c := api.NewClient("invalid-url")
-	_, err := c.FileExperts(t.Context(), []heartbeat.Heartbeat{
+	_, err := c.FileExperts(context.Background(), []heartbeat.Heartbeat{
 		{
 			APIKey:           "00000000-0000-4000-8000-000000000000",
 			Entity:           "/tmp/main.go",

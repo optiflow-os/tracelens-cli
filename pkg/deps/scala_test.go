@@ -1,6 +1,7 @@
 package deps_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/deps"
@@ -12,7 +13,7 @@ import (
 func TestParserScala_Parse(t *testing.T) {
 	parser := deps.ParserScala{}
 
-	dependencies, err := parser.Parse(t.Context(), "testdata/scala.scala")
+	dependencies, err := parser.Parse(context.Background(), "testdata/scala.scala")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{

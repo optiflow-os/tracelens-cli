@@ -3,34 +3,55 @@ module github.com/optiflow-os/tracelens-cli
 go 1.24.2
 
 require (
+	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
+	github.com/alecthomas/assert v1.0.0
+	github.com/alecthomas/chroma/v2 v2.17.2
+	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
+	github.com/dlclark/regexp2 v1.11.5
+	github.com/gandarez/go-olson-timezone v0.1.0
+	github.com/gandarez/go-realpath v1.0.0
 	github.com/go-viper/encoding/ini v0.1.1
+	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf
+	github.com/kevinburke/ssh_config v1.2.0
+	github.com/matishsiao/goInfo v0.0.0-20241216093258-66a9250504d6
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/pkg/sftp v1.13.7
+	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f
+	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
+	github.com/stretchr/testify v1.10.0
+	go.etcd.io/bbolt v1.4.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.32.0
+	golang.org/x/net v0.33.0
+	golang.org/x/text v0.21.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
-	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/alecthomas/colour v0.1.0 // indirect
+	github.com/alecthomas/repr v0.4.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
-	github.com/gandarez/go-realpath v1.0.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/juju/errors v1.0.0 // indirect
-	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
+	github.com/juju/testing v1.2.0 // indirect
+	github.com/kr/fs v0.1.0 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
+	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
-	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	go.etcd.io/bbolt v1.4.0 // indirect
+	github.com/yookoala/realpath v1.0.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

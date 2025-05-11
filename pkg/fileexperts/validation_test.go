@@ -29,7 +29,7 @@ func TestWithValidation(t *testing.T) {
 		}, nil
 	})
 
-	result, err := h(t.Context(), []heartbeat.Heartbeat{
+	result, err := h(context.Background(), []heartbeat.Heartbeat{
 		{
 			Entity:           "/path/to/file",
 			Project:          heartbeat.PointerTo("wakatime"),

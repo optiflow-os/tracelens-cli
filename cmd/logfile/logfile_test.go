@@ -1,6 +1,7 @@
 package logfile_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,7 +19,7 @@ func TestLoadParams(t *testing.T) {
 
 	defer tmpFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("log-file", tmpFile.Name())
@@ -43,7 +44,7 @@ func TestLoadParams_LogFile_FlagDeprecated(t *testing.T) {
 
 	defer tmpFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("logfile", tmpFile.Name())
@@ -60,7 +61,7 @@ func TestLoadParams_LogFile_FromConfig(t *testing.T) {
 
 	defer tmpFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("settings.log_file", tmpFile.Name())
@@ -79,7 +80,7 @@ func TestLoadParams_LogFile_FromEnvVar(t *testing.T) {
 
 	dir, _ := filepath.Split(tmpFile.Name())
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 
@@ -97,7 +98,7 @@ func TestLoadParams_LogFile_FlagTakesPrecedence(t *testing.T) {
 
 	defer tmpFile.Close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("log-file", tmpFile.Name())
@@ -110,7 +111,7 @@ func TestLoadParams_LogFile_FlagTakesPrecedence(t *testing.T) {
 }
 
 func TestLoadParams_Metrics_FromConfig(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("settings.metrics", true)
@@ -122,7 +123,7 @@ func TestLoadParams_Metrics_FromConfig(t *testing.T) {
 }
 
 func TestLoadParams_Metrics_FlagTakesPrecedence(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("metrics", false)
@@ -135,7 +136,7 @@ func TestLoadParams_Metrics_FlagTakesPrecedence(t *testing.T) {
 }
 
 func TestLoadParams_Verbose_FromConfig(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("settings.debug", true)
@@ -147,7 +148,7 @@ func TestLoadParams_Verbose_FromConfig(t *testing.T) {
 }
 
 func TestLoadParams_Verbose_FlagTakesPrecedence(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	v := viper.New()
 	v.Set("verbose", false)

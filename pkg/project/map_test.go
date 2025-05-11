@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,7 +32,7 @@ func TestMap_Detect(t *testing.T) {
 		},
 	}
 
-	result, detected, err := m.Detect(t.Context())
+	result, detected, err := m.Detect(context.Background())
 	require.NoError(t, err)
 
 	assert.True(t, detected)
@@ -61,7 +62,7 @@ func TestMap_Detect_RegexReplace(t *testing.T) {
 		},
 	}
 
-	result, detected, err := m.Detect(t.Context())
+	result, detected, err := m.Detect(context.Background())
 	require.NoError(t, err)
 
 	assert.True(t, detected)
@@ -88,7 +89,7 @@ func TestMap_Detect_NoMatch(t *testing.T) {
 		},
 	}
 
-	result, detected, err := m.Detect(t.Context())
+	result, detected, err := m.Detect(context.Background())
 	require.NoError(t, err)
 
 	assert.False(t, detected)
@@ -102,7 +103,7 @@ func TestMap_Detect_ZeroPatterns(t *testing.T) {
 		Patterns: []project.MapPattern{},
 	}
 
-	_, detected, err := m.Detect(t.Context())
+	_, detected, err := m.Detect(context.Background())
 	require.NoError(t, err)
 
 	assert.False(t, detected)

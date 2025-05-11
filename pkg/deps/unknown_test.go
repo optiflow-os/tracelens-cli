@@ -1,6 +1,7 @@
 package deps_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/deps"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestParserUnknown_Parse(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]struct {
 		Filepath string

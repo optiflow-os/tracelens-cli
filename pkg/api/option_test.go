@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -19,7 +20,7 @@ import (
 )
 
 func TestOption_WithAuth(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]struct {
 		User            string
@@ -87,7 +88,7 @@ func TestOption_WithHostname(t *testing.T) {
 
 	c := api.NewClient("", opts...)
 
-	resp, err := c.Do(t.Context(), req)
+	resp, err := c.Do(context.Background(), req)
 	require.NoError(t, err)
 
 	defer resp.Body.Close()
@@ -114,7 +115,7 @@ func TestOption_WithInvalidHostname(t *testing.T) {
 
 	c := api.NewClient("", opts...)
 
-	resp, err := c.Do(t.Context(), req)
+	resp, err := c.Do(context.Background(), req)
 	require.NoError(t, err)
 
 	defer resp.Body.Close()
@@ -123,7 +124,7 @@ func TestOption_WithInvalidHostname(t *testing.T) {
 }
 
 func TestOption_WithNTLM(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]string{
 		"default":  `domain\\john:123456`,
@@ -181,7 +182,7 @@ func TestOption_WithNTLMRequestRetry(t *testing.T) {
 	url, router, close := setupTestServer()
 	defer close()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	var numCalls int
 
@@ -257,7 +258,7 @@ func TestOption_WithProxy(t *testing.T) {
 
 	c := api.NewClient("", opts...)
 
-	resp, err := c.Do(t.Context(), req)
+	resp, err := c.Do(context.Background(), req)
 	require.NoError(t, err)
 
 	defer resp.Body.Close()
@@ -269,7 +270,7 @@ func TestOption_WithUserAgent(t *testing.T) {
 	url, router, tearDown := setupTestServer()
 	defer tearDown()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	var numCalls int
 
@@ -309,7 +310,7 @@ func TestOption_WithUserAgentUnknownPlugin(t *testing.T) {
 	url, router, tearDown := setupTestServer()
 	defer tearDown()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	var numCalls int
 
@@ -364,7 +365,7 @@ func TestOption_WithTimezone(t *testing.T) {
 
 	c := api.NewClient("", opts...)
 
-	resp, err := c.Do(t.Context(), req)
+	resp, err := c.Do(context.Background(), req)
 	require.NoError(t, err)
 
 	defer resp.Body.Close()

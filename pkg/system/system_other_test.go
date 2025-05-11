@@ -3,6 +3,7 @@
 package system_test
 
 import (
+	"context"
 	"runtime"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestOSName(t *testing.T) {
 		t.Skip("skipping test on non-darwin and non-windows system")
 	}
 
-	name := system.OSName(t.Context())
+	name := system.OSName(context.Background())
 
 	assert.Equal(t, runtime.GOOS, name)
 }

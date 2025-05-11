@@ -1,6 +1,7 @@
 package deps_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/deps"
@@ -12,7 +13,7 @@ import (
 func TestParserKotlin_Parse(t *testing.T) {
 	parser := deps.ParserKotlin{}
 
-	dependencies, err := parser.Parse(t.Context(), "testdata/kotlin.kt")
+	dependencies, err := parser.Parse(context.Background(), "testdata/kotlin.kt")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{

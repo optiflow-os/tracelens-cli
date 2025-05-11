@@ -1,6 +1,7 @@
 package params
 
 import (
+	"context"
 	"regexp"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestParseBoolOrRegexList(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	tests := map[string]struct {
 		Input    string

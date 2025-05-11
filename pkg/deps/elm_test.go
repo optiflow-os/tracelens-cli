@@ -1,6 +1,7 @@
 package deps_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/deps"
@@ -12,7 +13,7 @@ import (
 func TestParserElm_Parse(t *testing.T) {
 	parser := deps.ParserElm{}
 
-	dependencies, err := parser.Parse(t.Context(), "testdata/elm.elm")
+	dependencies, err := parser.Parse(context.Background(), "testdata/elm.elm")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{

@@ -1,6 +1,7 @@
 package deps_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/deps"
@@ -11,7 +12,7 @@ import (
 func TestParserCPP_Parse(t *testing.T) {
 	parser := deps.ParserCPP{}
 
-	dependencies, err := parser.Parse(t.Context(), "testdata/cpp.cpp")
+	dependencies, err := parser.Parse(context.Background(), "testdata/cpp.cpp")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{
