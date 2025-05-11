@@ -1,30 +1,43 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	stdlog "log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
-	cmdconfigread "github.com/optiflow-os/tracelens-cli/cmd/configread"
-	cmdconfigwrite "github.com/optiflow-os/tracelens-cli/cmd/configwrite"
-	cmdfileexperts "github.com/optiflow-os/tracelens-cli/cmd/fileexperts"
+	cmdapi "github.com/optiflow-os/tracelens-cli/cmd/api"
+	"github.com/optiflow-os/tracelens-cli/cmd/configread"
+	"github.com/optiflow-os/tracelens-cli/cmd/configwrite"
+	"github.com/optiflow-os/tracelens-cli/cmd/fileexperts"
 	cmdheartbeat "github.com/optiflow-os/tracelens-cli/cmd/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/cmd/logfile"
 	cmdoffline "github.com/optiflow-os/tracelens-cli/cmd/offline"
-	cmdofflinecount "github.com/optiflow-os/tracelens-cli/cmd/offlinecount"
-	cmdofflineprint "github.com/optiflow-os/tracelens-cli/cmd/offlineprint"
-	cmdofflinesync "github.com/optiflow-os/tracelens-cli/cmd/offlinesync"
-	cmdtoday "github.com/optiflow-os/tracelens-cli/cmd/today"
-	cmdtodaygoal "github.com/optiflow-os/tracelens-cli/cmd/todaygoal"
+	"github.com/optiflow-os/tracelens-cli/cmd/offlinecount"
+	"github.com/optiflow-os/tracelens-cli/cmd/offlineprint"
+	"github.com/optiflow-os/tracelens-cli/cmd/offlinesync"
+	"github.com/optiflow-os/tracelens-cli/cmd/params"
+	"github.com/optiflow-os/tracelens-cli/cmd/today"
+	"github.com/optiflow-os/tracelens-cli/cmd/todaygoal"
+	"github.com/optiflow-os/tracelens-cli/pkg/diagnostic"
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/pkg/ini"
+	"github.com/optiflow-os/tracelens-cli/pkg/lexer"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
+	"github.com/optiflow-os/tracelens-cli/pkg/metrics"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
+	"github.com/optiflow-os/tracelens-cli/pkg/vipertools"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -35,51 +48,16 @@ type diagnostics struct {
 	Stack         string
 }
 
-// cmdFn 表示命令函数。
-type cmdFn func(ctx context.Context, v *viper.Viper) (int, error)
-
-// RunCmd 运行命令函数并使用命令函数返回的退出代码退出。
-// 在任何错误或崩溃时将发送诊断信息。
-func RunCmd(ctx context.Context, v *viper.Viper, verbose bool, sendDiagsOnErrors bool, cmd cmdFn) error {
-	logger := log.Extract(ctx)
-
-	// 运行命令
-	exitCode, err := cmd(ctx, v)
-	if err != nil {
-		if verbose {
-			logger.Errorf("运行命令失败: %s", err)
-		}
-	}
-
-	if exitCode != exitcode.Success {
-		logger.Debugf("命令执行失败，退出代码 %d", exitCode)
-		return exitcode.Err{Code: exitCode}
-	}
-
-	return nil
-}
-
-// RunCmdWithOfflineSync 运行命令函数并使用命令函数返回的退出代码退出。
-// 如果命令运行成功，它会随后执行离线同步命令。
-// 在任何错误或崩溃时将发送诊断信息。
-func RunCmdWithOfflineSync(ctx context.Context, v *viper.Viper, verbose bool, sendDiagsOnErrors bool, cmd cmdFn) error {
-	if err := RunCmd(ctx, v, verbose, sendDiagsOnErrors, cmd); err != nil {
-		return err
-	}
-
-	return RunCmd(ctx, v, verbose, sendDiagsOnErrors, cmdofflinesync.RunWithRateLimiting)
-}
-
-// RunE 执行从命令行解析的命令。
+// RunE executes commands parsed from a command line.
 func RunE(cmd *cobra.Command, v *viper.Viper) error {
 	ctx := context.Background()
 
-	// 从上下文中提取日志记录器，尽管它尚未完全初始化
+	// extract logger from context despite it's not fully initialized yet
 	logger := log.Extract(ctx)
 
 	err := parseConfigFiles(ctx, v)
 	if err != nil {
-		logger.Errorf("解析配置文件失败: %s", err)
+		logger.Errorf("failed to parse config files: %s", err)
 
 		if v.IsSet("entity") {
 			_ = saveHeartbeats(ctx, v)
@@ -90,77 +68,94 @@ func RunE(cmd *cobra.Command, v *viper.Viper) error {
 
 	logger, err = SetupLogging(ctx, v)
 	if err != nil {
-		// 日志记录器实例设置失败，使用标准输出记录并退出
-		stdlog.Fatalf("设置日志记录失败: %s", err)
+		// log to std out and exit, as logger instance failed to setup
+		stdlog.Fatalf("failed to setup logging: %s", err)
 	}
 
-	// 将日志记录器保存到上下文
+	// save logger to context
 	ctx = log.ToContext(ctx, logger)
 
-	// 开始分析（如果启用）
+	// register all custom lexers
+	if err := lexer.RegisterAll(); err != nil {
+		logger.Fatalf("failed to register custom lexers: %s", err)
+	}
+
+	// start profiling if enabled
 	if logger.IsMetricsEnabled() {
-		// 在完整实现时添加指标功能
-		logger.Debugln("已启用指标收集")
+		shutdown, err := metrics.StartProfiling(ctx)
+		if err != nil {
+			logger.Errorf("failed to start profiling: %s", err)
+		} else {
+			defer shutdown()
+		}
+	}
+
+	if v.GetBool("user-agent") {
+		logger.Debugln("command: user-agent")
+
+		fmt.Println(heartbeat.UserAgent(ctx, vipertools.GetString(v, "plugin")))
+
+		return nil
 	}
 
 	if v.GetBool("version") {
-		logger.Debugln("命令: version")
+		logger.Debugln("command: version")
 
 		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), runVersion)
 	}
 
-	if v.IsSet("entity") {
-		logger.Debugln("命令: heartbeat")
-
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdheartbeat.Run)
-	}
-
-	if v.IsSet("sync-offline-activity") {
-		logger.Debugln("命令: sync-offline-activity")
-
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdofflinesync.RunWithoutRateLimiting)
-	}
-
-	if v.GetBool("offline-count") {
-		logger.Debugln("命令: offline-count")
-
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdofflinecount.Run)
-	}
-
-	if v.IsSet("print-offline-heartbeats") {
-		logger.Debugln("命令: print-offline-heartbeats")
-
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdofflineprint.Run)
-	}
-
 	if v.IsSet("config-read") {
-		logger.Debugln("命令: config-read")
+		logger.Debugln("command: config-read")
 
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdconfigread.Run)
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), configread.Run)
 	}
 
 	if v.IsSet("config-write") {
-		logger.Debugln("命令: config-write")
+		logger.Debugln("command: config-write")
 
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdconfigwrite.Run)
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), configwrite.Run)
 	}
 
 	if v.GetBool("today") {
-		logger.Debugln("命令: today")
+		logger.Debugln("command: today")
 
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdtoday.Run)
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), today.Run)
 	}
 
 	if v.IsSet("today-goal") {
-		logger.Debugln("命令: today-goal")
+		logger.Debugln("command: today-goal")
 
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdtodaygoal.Run)
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), todaygoal.Run)
 	}
 
 	if v.GetBool("file-experts") {
-		logger.Debugln("命令: file-experts")
+		logger.Debugln("command: file-experts")
 
-		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdfileexperts.Run)
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), fileexperts.Run)
+	}
+
+	if v.IsSet("entity") {
+		logger.Debugln("command: heartbeat")
+
+		return RunCmdWithOfflineSync(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), cmdheartbeat.Run)
+	}
+
+	if v.IsSet("sync-offline-activity") {
+		logger.Debugln("command: sync-offline-activity")
+
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), offlinesync.RunWithoutRateLimiting)
+	}
+
+	if v.GetBool("offline-count") {
+		logger.Debugln("command: offline-count")
+
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), offlinecount.Run)
+	}
+
+	if v.IsSet("print-offline-heartbeats") {
+		logger.Debugln("command: print-offline-heartbeats")
+
+		return RunCmd(ctx, v, logger.IsVerboseEnabled(), logger.SendDiagsOnErrors(), offlineprint.Run)
 	}
 
 	logger.Warnf("one of the following parameters has to be provided: %s", strings.Join([]string{
@@ -183,32 +178,68 @@ func RunE(cmd *cobra.Command, v *viper.Viper) error {
 }
 
 func parseConfigFiles(ctx context.Context, v *viper.Viper) error {
-	// 简化的配置文件解析功能，真实实现将在完整版本中添加
 	logger := log.Extract(ctx)
-	logger.Debugln("解析配置文件...")
+
+	var configFiles = []struct {
+		filePathFn func(context.Context, *viper.Viper) (string, error)
+	}{
+		{
+			filePathFn: ini.FilePath,
+		},
+		{
+			filePathFn: ini.ImportFilePath,
+		},
+		{
+			filePathFn: ini.InternalFilePath,
+		},
+	}
+
+	for _, c := range configFiles {
+		configFile, err := c.filePathFn(ctx, v)
+		if err != nil {
+			return fmt.Errorf("error getting config file path: %s", err)
+		}
+
+		if configFile == "" {
+			continue
+		}
+
+		// check if file exists
+		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			logger.Debugf("config file %q not present or not accessible", configFile)
+			continue
+		}
+
+		if err := ini.ReadInConfig(v, configFile); err != nil {
+			return fmt.Errorf("failed to load configuration file: %s", err)
+		}
+	}
 
 	return nil
 }
 
-// SetupLogging 使用 --log-file 参数配置记录到文件或标准输出。
-// 它返回一个带有配置设置的日志记录器，如果未设置，则返回默认设置。
+// SetupLogging uses the --log-file param to configure logging to file or stdout.
+// It returns a logger with the configured settings or the default settings if it's not set.
 func SetupLogging(ctx context.Context, v *viper.Viper) (*log.Logger, error) {
-	// 简化的日志设置，真实实现将在完整版本中添加
+	params, err := logfile.LoadParams(ctx, v)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load log params: %s", err)
+	}
+
 	var destOutput io.Writer = os.Stdout
 
-	logFile := v.GetString("log-file")
-	if logFile != "" && !v.GetBool("log-to-stdout") {
-		dir := filepath.Dir(logFile)
+	if !params.ToStdout {
+		dir := filepath.Dir(params.File)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			err := os.MkdirAll(dir, 0750)
 			if err != nil {
-				return nil, fmt.Errorf("创建日志文件目录 %q 失败: %s", dir, err)
+				return nil, fmt.Errorf("failed to create log file directory %q: %s", dir, err)
 			}
 		}
 
-		// 轮换日志文件
+		// rotate log files
 		destOutput = &lumberjack.Logger{
-			Filename:   logFile,
+			Filename:   params.File,
 			MaxSize:    log.MaxLogFileSize,
 			MaxBackups: log.MaxNumberOfBackups,
 		}
@@ -216,12 +247,108 @@ func SetupLogging(ctx context.Context, v *viper.Viper) (*log.Logger, error) {
 
 	logger := log.New(
 		destOutput,
-		log.WithVerbose(v.GetBool("verbose")),
-		log.WithSendDiagsOnErrors(v.GetBool("send-diagnostics-on-errors")),
-		log.WithMetrics(v.GetBool("metrics")),
+		log.WithVerbose(params.Verbose),
+		log.WithSendDiagsOnErrors(params.SendDiagsOnErrors),
+		log.WithMetrics(params.Metrics),
 	)
 
 	return logger, nil
+}
+
+// cmdFn represents a command function.
+type cmdFn func(ctx context.Context, v *viper.Viper) (int, error)
+
+// RunCmd runs a command function and exits with the exit code returned by
+// the command function. Will send diagnostic on any errors or panics.
+func RunCmd(ctx context.Context, v *viper.Viper, verbose bool, sendDiagsOnErrors bool, cmd cmdFn) error {
+	return runCmd(ctx, v, verbose, sendDiagsOnErrors, cmd)
+}
+
+// RunCmdWithOfflineSync runs a command function and exits with the exit code
+// returned by the command function. If command run was successful, it will execute
+// offline sync command afterwards. Will send diagnostic on any errors or panics.
+func RunCmdWithOfflineSync(ctx context.Context, v *viper.Viper, verbose bool, sendDiagsOnErrors bool, cmd cmdFn) error {
+	if err := runCmd(ctx, v, verbose, sendDiagsOnErrors, cmd); err != nil {
+		return err
+	}
+
+	return runCmd(ctx, v, verbose, sendDiagsOnErrors, offlinesync.RunWithRateLimiting)
+}
+
+// runCmd contains the main logic of RunCmd.
+// It will send diagnostic on any errors or panics.
+// On panic, it will send diagnostic and exit with ErrGeneric exit code.
+// On error, it will only send diagnostic if sendDiagsOnErrors and verbose is true.
+func runCmd(ctx context.Context, v *viper.Viper, verbose bool, sendDiagsOnErrors bool, cmd cmdFn) (errresponse error) {
+	logs := bytes.NewBuffer(nil)
+	resetLogs := captureLogs(ctx, logs)
+
+	logger := log.Extract(ctx)
+
+	// catch panics
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Errorf("panicked: %v. Stack: %s", r, string(debug.Stack()))
+
+			resetLogs()
+
+			diags := diagnostics{
+				OriginalError: r,
+				Panicked:      true,
+				Stack:         string(debug.Stack()),
+			}
+
+			if verbose {
+				diags.Logs = logs.String()
+			}
+
+			if err := sendDiagnostics(ctx, v, diags); err != nil {
+				logger.Warnf("failed to send diagnostics: %s", err)
+			}
+
+			errresponse = exitcode.Err{Code: exitcode.ErrGeneric}
+		}
+	}()
+
+	var err error
+
+	// run command
+	exitCode, err := cmd(ctx, v)
+	// nolint:nestif
+	if err != nil {
+		if errwaka, ok := err.(wakaerror.Error); ok {
+			sendDiagsOnErrors = sendDiagsOnErrors || errwaka.SendDiagsOnErrors()
+			// if verbose is not set, use the value from the error
+			verbose = verbose || errwaka.ShouldLogError()
+		}
+
+		if errloglevel, ok := err.(wakaerror.LogLevel); ok {
+			logger.Logf(zapcore.Level(errloglevel.LogLevel()), "failed to run command: %s", err)
+		} else if verbose {
+			logger.Errorf("failed to run command: %s", err)
+		}
+
+		resetLogs()
+
+		if verbose && sendDiagsOnErrors {
+			if err := sendDiagnostics(ctx, v,
+				diagnostics{
+					Logs:          logs.String(),
+					OriginalError: err.Error(),
+					Stack:         string(debug.Stack()),
+				}); err != nil {
+				logger.Warnf("failed to send diagnostics: %s", err)
+			}
+		}
+	}
+
+	if exitCode != exitcode.Success {
+		logger.Debugf("command failed with exit code %d", exitCode)
+
+		errresponse = exitcode.Err{Code: exitCode}
+	}
+
+	return errresponse
 }
 
 func saveHeartbeats(ctx context.Context, v *viper.Viper) int {
@@ -229,14 +356,57 @@ func saveHeartbeats(ctx context.Context, v *viper.Viper) int {
 
 	queueFilepath, err := offline.QueueFilepath(ctx, v)
 	if err != nil {
-		logger.Warnf("加载离线队列文件路径失败: %s", err)
-		return exitcode.ErrGeneric
+		logger.Warnf("failed to load offline queue filepath: %s", err)
 	}
 
 	if err := cmdoffline.SaveHeartbeats(ctx, v, nil, queueFilepath); err != nil {
-		logger.Errorf("保存心跳到离线队列失败: %s", err)
+		logger.Errorf("failed to save heartbeats to offline queue: %s", err)
+
 		return exitcode.ErrGeneric
 	}
 
 	return exitcode.Success
+}
+
+func sendDiagnostics(ctx context.Context, v *viper.Viper, d diagnostics) error {
+	paramAPI, err := params.LoadAPIParams(ctx, v)
+	if err != nil {
+		return fmt.Errorf("failed to load API parameters: %s", err)
+	}
+
+	c, err := cmdapi.NewClient(ctx, paramAPI)
+	if err != nil {
+		return fmt.Errorf("failed to initialize api client: %s", err)
+	}
+
+	diagnostics := []diagnostic.Diagnostic{
+		diagnostic.Error(d.OriginalError),
+		diagnostic.Logs(d.Logs),
+		diagnostic.Stack(d.Stack),
+	}
+
+	err = c.SendDiagnostics(ctx, paramAPI.Plugin, d.Panicked, diagnostics...)
+	if err != nil {
+		return fmt.Errorf("failed to send diagnostics to the API: %s", err)
+	}
+
+	logger := log.Extract(ctx)
+	logger.Debugln("successfully sent diagnostics")
+
+	return nil
+}
+
+func captureLogs(ctx context.Context, dest io.Writer) func() {
+	logger := log.Extract(ctx)
+
+	logOutput := logger.Output()
+
+	// will write to log output and dest
+	mw := io.MultiWriter(logOutput, dest)
+
+	logger.SetOutput(mw)
+
+	return func() {
+		logger.SetOutput(logOutput)
+	}
 }

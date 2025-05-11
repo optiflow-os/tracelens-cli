@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/optiflow-os/tracelens-cli/cmd/params"
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"

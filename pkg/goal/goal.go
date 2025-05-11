@@ -5,17 +5,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/output"
 )
 
 type (
-	// Goal 表示一个目标。
+	// Goal represents a goal.
 	Goal struct {
 		CachedAt string `json:"cached_at"`
 		Data     Data   `json:"data"`
 	}
 
-	// Range 表示目标的时间范围。
+	// Range represents the time range of a goal.
 	Range struct {
 		Date     string `json:"date"`
 		End      string `json:"end"`
@@ -24,7 +24,7 @@ type (
 		Timezone string `json:"timezone"`
 	}
 
-	// ChartData 表示目标的图表数据。
+	// ChartData represents the chart data of a goal.
 	ChartData struct {
 		ActualSeconds          float64 `json:"actual_seconds"`
 		ActualSecondsText      string  `json:"actual_seconds_text"`
@@ -36,7 +36,7 @@ type (
 		RangeStatusReasonShort string  `json:"range_status_reason_short"`
 	}
 
-	// Owner 表示目标的所有者。
+	// Owner represents the owner of a goal.
 	Owner struct {
 		DisplayName string  `json:"display_name"`
 		Email       *string `json:"email"`
@@ -46,7 +46,7 @@ type (
 		Username    string  `json:"username"`
 	}
 
-	// Subscriber 表示目标的订阅者。
+	// Subscriber represents a subscriber of a goal.
 	Subscriber struct {
 		DisplayName    string  `json:"display_name"`
 		Email          *string `json:"email"`
@@ -56,7 +56,7 @@ type (
 		Username       string  `json:"username"`
 	}
 
-	// Data 表示目标的数据。
+	// Data represents the data of a goal.
 	Data struct {
 		AverageStatus           string       `json:"average_status"`
 		ChartData               []ChartData  `json:"chart_data"`
@@ -90,10 +90,10 @@ type (
 	}
 )
 
-// RenderToday 从当前日期的目标生成文本表示。
-// 如果out设置为output.RawJSONOutput或output.JSONOutput，目标将被序列化为JSON。
-// 预期当前日期恰好有一个摘要。否则将返回错误。
-func RenderToday(goal *Goal, out utils.Output) (string, error) {
+// RenderToday generates a text representation from goal of the current day.
+// If out is set to output.RawJSONOutput or output.JSONOutput, the goal will be marshaled to JSON.
+// Expects exactly one summary for the current day. Will return an error otherwise.
+func RenderToday(goal *Goal, out output.Output) (string, error) {
 	if goal == nil {
 		return "", errors.New("no goal found for the current day")
 	}
@@ -102,7 +102,7 @@ func RenderToday(goal *Goal, out utils.Output) (string, error) {
 		return "", errors.New("no chart data found for the current day")
 	}
 
-	if out == utils.RawJSONOutput {
+	if out == output.RawJSONOutput {
 		data, err := json.Marshal(goal)
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal json goal: %s", err)

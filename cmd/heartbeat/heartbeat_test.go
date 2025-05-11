@@ -20,11 +20,12 @@ import (
 	cmdparams "github.com/optiflow-os/tracelens-cli/cmd/params"
 	"github.com/optiflow-os/tracelens-cli/pkg/api"
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/pkg/ini"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
 	"github.com/optiflow-os/tracelens-cli/pkg/project"
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
 	"github.com/optiflow-os/tracelens-cli/pkg/version"
+	"github.com/optiflow-os/tracelens-cli/pkg/windows"
 
 	"github.com/gandarez/go-realpath"
 	"github.com/matishsiao/goInfo"
@@ -115,7 +116,7 @@ func TestSendHeartbeats(t *testing.T) {
 	v.Set("language", "Go")
 	v.Set("alternate-language", "Golang")
 	v.Set("hide-branch-names", true)
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("lineno", 13)
 	v.Set("local-file", "testdata/localfile.go")
 	v.Set("plugin", plugin)
@@ -176,7 +177,7 @@ func TestSendHeartbeats_RateLimited(t *testing.T) {
 	v.Set("language", "Go")
 	v.Set("alternate-language", "Golang")
 	v.Set("hide-branch-names", true)
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("lineno", 13)
 	v.Set("local-file", "testdata/localfile.go")
 	v.Set("plugin", plugin)
@@ -392,7 +393,7 @@ func TestSendHeartbeats_ExtraHeartbeats(t *testing.T) {
 	v.Set("extra-heartbeats", true)
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("hide-branch-names", true)
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("language", "Go")
 	v.Set("alternate-language", "Golang")
 	v.Set("lineno", 2)
@@ -479,7 +480,7 @@ func TestSendHeartbeats_ExtraHeartbeats_Sanitize(t *testing.T) {
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("hide-branch-names", true)
 	v.Set("hide-file-names", true)
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("language", "Go")
 	v.Set("alternate-language", "Golang")
 	v.Set("lineno", 13)
@@ -546,7 +547,7 @@ func TestSendHeartbeats_ExtraHeartbeats_Sanitize(t *testing.T) {
 			Language:         heartbeat.PointerTo("Go"),
 			LineNumber:       nil,
 			Lines:            nil,
-			Project:          heartbeat.PointerTo("tracelens-cli"),
+			Project:          heartbeat.PointerTo("wakatime-cli"),
 			ProjectRootCount: nil,
 			Time:             1585598059,
 			UserAgent:        userAgent,
@@ -700,7 +701,7 @@ func TestSendHeartbeats_ExtraHeartbeatsIsUnsavedEntity(t *testing.T) {
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("language", "Go")
 	v.Set("alternate-language", "Golang")
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("hide-branch-names", true)
 	v.Set("lineno", 11)
 	v.Set("lines-in-file", 91)
@@ -827,7 +828,7 @@ func TestSendHeartbeats_NonExistingExtraHeartbeatsEntity(t *testing.T) {
 	v.Set("entity", "testdata/main.go")
 	v.Set("entity-type", "file")
 	v.Set("hide-branch-names", true)
-	v.Set("project", "tracelens-cli")
+	v.Set("project", "wakatime-cli")
 	v.Set("extra-heartbeats", true)
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("plugin", plugin)
@@ -917,7 +918,7 @@ func TestSendHeartbeats_ErrBackoff(t *testing.T) {
 	defer logFile.Close()
 
 	v := viper.New()
-	v.Set("internal.backoff_at", time.Now().Add(10*time.Minute).Format(uitls.DateFormat))
+	v.Set("internal.backoff_at", time.Now().Add(10*time.Minute).Format(ini.DateFormat))
 	v.Set("internal.backoff_retries", "1")
 	v.SetDefault("sync-offline-activity", 1000)
 	v.Set("api-url", testServerURL)
@@ -978,7 +979,7 @@ func TestSendHeartbeats_ErrBackoff_Verbose(t *testing.T) {
 	defer logFile.Close()
 
 	v := viper.New()
-	v.Set("internal.backoff_at", time.Now().Add(10*time.Minute).Format(utils.DateFormat))
+	v.Set("internal.backoff_at", time.Now().Add(10*time.Minute).Format(ini.DateFormat))
 	v.Set("internal.backoff_retries", "1")
 	v.SetDefault("sync-offline-activity", 1000)
 	v.Set("api-url", testServerURL)
@@ -1057,7 +1058,7 @@ func TestSendHeartbeats_ObfuscateProject(t *testing.T) {
 		err = json.Unmarshal(body, &[]any{&entity})
 		require.NoError(t, err)
 
-		lines, err := project.ReadFile(ctx, filepath.Join(fp, "tracelens-cli", ".wakatime-project"), 1)
+		lines, err := project.ReadFile(ctx, filepath.Join(fp, "wakatime-cli", ".wakatime-project"), 1)
 		require.NoError(t, err)
 
 		expectedBodyStr := fmt.Sprintf(
@@ -1088,7 +1089,7 @@ func TestSendHeartbeats_ObfuscateProject(t *testing.T) {
 	v.Set("api-url", testServerURL)
 	v.Set("category", "debugging")
 	v.Set("cursorpos", 42)
-	v.Set("entity", filepath.Join(fp, "tracelens-cli/src/pkg/file.go"))
+	v.Set("entity", filepath.Join(fp, "wakatime-cli/src/pkg/file.go"))
 	v.Set("entity-type", "file")
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("language", "Go")
@@ -1152,7 +1153,7 @@ func TestSendHeartbeats_ObfuscateProjectNotBranch(t *testing.T) {
 		err = json.Unmarshal(body, &[]any{&entity})
 		require.NoError(t, err)
 
-		lines, err := project.ReadFile(ctx, filepath.Join(fp, "tracelens-cli", ".wakatime-project"), 1)
+		lines, err := project.ReadFile(ctx, filepath.Join(fp, "wakatime-cli", ".wakatime-project"), 1)
 		require.NoError(t, err)
 
 		expectedBodyStr := fmt.Sprintf(string(expectedBody), entity.Entity, lines[0], heartbeat.UserAgent(ctx, plugin))
@@ -1178,7 +1179,7 @@ func TestSendHeartbeats_ObfuscateProjectNotBranch(t *testing.T) {
 	v.Set("api-url", testServerURL)
 	v.Set("category", "debugging")
 	v.Set("cursorpos", 42)
-	v.Set("entity", filepath.Join(fp, "tracelens-cli/src/pkg/file.go"))
+	v.Set("entity", filepath.Join(fp, "wakatime-cli/src/pkg/file.go"))
 	v.Set("entity-type", "file")
 	v.Set("key", "00000000-0000-4000-8000-000000000000")
 	v.Set("language", "Go")
@@ -1274,7 +1275,7 @@ func TestResetRateLimit(t *testing.T) {
 	v.Set("config", tmpFileInternal.Name())
 	v.Set("internal-config", tmpFileInternal.Name())
 
-	writer, err := utils.NewWriter(ctx, v, func(_ context.Context, vp *viper.Viper) (string, error) {
+	writer, err := ini.NewWriter(ctx, v, func(_ context.Context, vp *viper.Viper) (string, error) {
 		assert.Equal(t, v, vp)
 		return tmpFileInternal.Name(), nil
 	})
@@ -1286,7 +1287,7 @@ func TestResetRateLimit(t *testing.T) {
 	err = writer.File.Reload()
 	require.NoError(t, err)
 
-	lastSentAt := writer.File.Section("internal").Key("heartbeats_last_sent_at").MustTimeFormat(utils.DateFormat)
+	lastSentAt := writer.File.Section("internal").Key("heartbeats_last_sent_at").MustTimeFormat(ini.DateFormat)
 
 	assert.WithinDuration(t, time.Now(), lastSentAt, 1*time.Second)
 }
@@ -1305,22 +1306,22 @@ func setupTestGitBasic(t *testing.T) (fp string) {
 	require.NoError(t, err)
 
 	if runtime.GOOS == "windows" {
-		tmpDir = utils.FormatFilePath(tmpDir)
+		tmpDir = windows.FormatFilePath(tmpDir)
 	}
 
-	err = os.MkdirAll(filepath.Join(tmpDir, "tracelens-cli/src/pkg"), os.FileMode(int(0700)))
+	err = os.MkdirAll(filepath.Join(tmpDir, "wakatime-cli/src/pkg"), os.FileMode(int(0700)))
 	require.NoError(t, err)
 
-	tmpFile, err := os.Create(filepath.Join(tmpDir, "tracelens-cli/src/pkg/file.go"))
+	tmpFile, err := os.Create(filepath.Join(tmpDir, "wakatime-cli/src/pkg/file.go"))
 	require.NoError(t, err)
 
 	defer tmpFile.Close()
 
-	err = os.Mkdir(filepath.Join(tmpDir, "tracelens-cli/.git"), os.FileMode(int(0700)))
+	err = os.Mkdir(filepath.Join(tmpDir, "wakatime-cli/.git"), os.FileMode(int(0700)))
 	require.NoError(t, err)
 
-	copyFile(t, "testdata/git_basic/config", filepath.Join(tmpDir, "tracelens-cli/.git/config"))
-	copyFile(t, "testdata/git_basic/HEAD", filepath.Join(tmpDir, "tracelens-cli/.git/HEAD"))
+	copyFile(t, "testdata/git_basic/config", filepath.Join(tmpDir, "wakatime-cli/.git/config"))
+	copyFile(t, "testdata/git_basic/HEAD", filepath.Join(tmpDir, "wakatime-cli/.git/HEAD"))
 
 	return tmpDir
 }

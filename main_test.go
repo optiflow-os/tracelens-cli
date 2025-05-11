@@ -18,11 +18,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
 	"github.com/optiflow-os/tracelens-cli/pkg/project"
 	"github.com/optiflow-os/tracelens-cli/pkg/version"
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/windows"
 
 	"github.com/gandarez/go-realpath"
 	"github.com/stretchr/testify/assert"

@@ -6,7 +6,7 @@ import (
 	"runtime"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/windows"
 
 	"github.com/gandarez/go-realpath"
 )
@@ -47,7 +47,7 @@ func Format(ctx context.Context, h Heartbeat) Heartbeat {
 		return h
 	}
 
-	if !utils.IsWindowsNetworkMount(h.Entity) {
+	if !windows.IsWindowsNetworkMount(h.Entity) {
 		formatLinuxFilePath(ctx, &h)
 	}
 
@@ -103,18 +103,18 @@ func formatWindowsFilePath(ctx context.Context, h *Heartbeat) {
 		return
 	}
 
-	h.Entity = utils.FormatFilePath(formatted)
+	h.Entity = windows.FormatFilePath(formatted)
 
-	if !utils.IsWindowsNetworkMount(h.Entity) {
+	if !windows.IsWindowsNetworkMount(h.Entity) {
 		var err error
 
-		h.LocalFile, err = utils.FormatLocalFilePath(h.LocalFile, h.Entity)
+		h.LocalFile, err = windows.FormatLocalFilePath(h.LocalFile, h.Entity)
 		if err != nil {
 			logger.Debugf("failed to format local file path: %s", err)
 		}
 	}
 
 	if h.ProjectPathOverride != "" {
-		h.ProjectPathOverride = utils.FormatFilePath(h.ProjectPathOverride)
+		h.ProjectPathOverride = windows.FormatFilePath(h.ProjectPathOverride)
 	}
 }

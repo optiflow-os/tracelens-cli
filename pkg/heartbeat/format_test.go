@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/windows"
 
 	"github.com/gandarez/go-realpath"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ func TestWithFormatting(t *testing.T) {
 		require.NoError(t, err)
 
 		if runtime.GOOS == "windows" {
-			entity = utils.FormatFilePath(entity)
+			entity = windows.FormatFilePath(entity)
 		}
 
 		assert.Equal(t, []heartbeat.Heartbeat{

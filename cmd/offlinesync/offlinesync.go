@@ -3,52 +3,169 @@ package offlinesync
 import (
 	"context"
 	"fmt"
+	"os"
 
+	cmdapi "github.com/optiflow-os/tracelens-cli/cmd/api"
+	cmdheartbeat "github.com/optiflow-os/tracelens-cli/cmd/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/cmd/params"
+	"github.com/optiflow-os/tracelens-cli/pkg/apikey"
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"github.com/spf13/viper"
 )
 
-// RunWithoutRateLimiting 运行离线同步命令，不考虑速率限制。
+// RunWithoutRateLimiting executes the sync-offline-activity command without rate limiting.
 func RunWithoutRateLimiting(ctx context.Context, v *viper.Viper) (int, error) {
+	return run(ctx, v)
+}
+
+// RunWithRateLimiting executes sync-offline-activity command with rate limiting enabled.
+func RunWithRateLimiting(ctx context.Context, v *viper.Viper) (int, error) {
+	paramOffline := params.LoadOfflineParams(ctx, v)
+
 	logger := log.Extract(ctx)
-	logger.Debugln("运行离线同步命令 (无速率限制)")
 
-	// 获取要同步的心跳数量
-	syncCount := v.GetInt("sync-offline-activity")
+	if cmdheartbeat.RateLimited(cmdheartbeat.RateLimitParams{
+		Disabled:   paramOffline.Disabled,
+		LastSentAt: paramOffline.LastSentAt,
+		Timeout:    paramOffline.RateLimit,
+	}) {
+		logger.Debugln("skip syncing offline activity to respect rate limit")
+		return exitcode.Success, nil
+	}
 
-	// 在真实实现中，这将从离线数据库中获取心跳并同步到 API
-	// 这里我们只是记录同步行为
-	logger.Infof("将同步 %d 个离线心跳（最大值）", syncCount)
-	fmt.Printf("同步离线活动：%d 个心跳（最大值）\n", syncCount)
+	return run(ctx, v)
+}
+
+func run(ctx context.Context, v *viper.Viper) (int, error) {
+	paramOffline := params.LoadOfflineParams(ctx, v)
+	if paramOffline.Disabled {
+		return exitcode.Success, nil
+	}
+
+	queueFilepath, err := offline.QueueFilepath(ctx, v)
+	if err != nil {
+		return exitcode.ErrGeneric, fmt.Errorf(
+			"offline sync failed: failed to load offline queue filepath: %s",
+			err,
+		)
+	}
+
+	logger := log.Extract(ctx)
+
+	queueFilepathLegacy, err := offline.QueueFilepathLegacy(ctx, v)
+	if err != nil {
+		logger.Warnf("legacy offline sync failed: failed to load offline queue filepath: %s", err)
+	}
+
+	if err = syncOfflineActivityLegacy(ctx, v, queueFilepathLegacy); err != nil {
+		logger.Warnf("legacy offline sync failed: %s", err)
+	}
+
+	if err = SyncOfflineActivity(ctx, v, queueFilepath); err != nil {
+		if errwaka, ok := err.(wakaerror.Error); ok {
+			return errwaka.ExitCode(), fmt.Errorf("offline sync failed: %s", errwaka.Message())
+		}
+
+		return exitcode.ErrGeneric, fmt.Errorf(
+			"offline sync failed: %s",
+			err,
+		)
+	}
+
+	logger.Debugln("successfully synced offline activity")
 
 	return exitcode.Success, nil
 }
 
-// RunWithRateLimiting 运行受速率限制的离线同步命令。
-func RunWithRateLimiting(ctx context.Context, v *viper.Viper) (int, error) {
+// syncOfflineActivityLegacy syncs the old offline activity by sending heartbeats
+// from the legacy offline queue to the WakaTime API.
+func syncOfflineActivityLegacy(ctx context.Context, v *viper.Viper, queueFilepath string) error {
+	if queueFilepath == "" {
+		return nil
+	}
+
+	if !fileExists(queueFilepath) {
+		return nil
+	}
+
+	paramOffline := params.LoadOfflineParams(ctx, v)
+
+	paramAPI, err := params.LoadAPIParams(ctx, v)
+	if err != nil {
+		return fmt.Errorf("failed to load API parameters: %w", err)
+	}
+
+	apiClient, err := cmdapi.NewClientWithoutAuth(ctx, paramAPI)
+	if err != nil {
+		return fmt.Errorf("failed to initialize api client: %w", err)
+	}
+
+	handle := heartbeat.NewHandle(apiClient,
+		offline.WithSync(queueFilepath, paramOffline.SyncMax),
+		apikey.WithReplacing(apikey.Config{
+			DefaultAPIKey: paramAPI.Key,
+			MapPatterns:   paramAPI.KeyPatterns,
+		}),
+	)
+
+	_, err = handle(ctx, nil)
+	if err != nil {
+		return err
+	}
+
 	logger := log.Extract(ctx)
-	logger.Debugln("运行离线同步命令 (有速率限制)")
 
-	// 获取速率限制秒数
-	rateLimitSecs := v.GetInt("heartbeat-rate-limit-seconds")
-	if rateLimitSecs == 0 {
-		// 如果速率限制为 0，则使用无速率限制的版本
-		return RunWithoutRateLimiting(ctx, v)
+	if err := os.Remove(queueFilepath); err != nil {
+		logger.Warnf("failed to delete legacy offline file: %s", err)
 	}
 
-	// 检查同步数量，默认使用 SyncMaxDefault
-	syncCount := offline.SyncMaxDefault
-	if v.IsSet("sync-offline-activity") {
-		syncCount = v.GetInt("sync-offline-activity")
+	return nil
+}
+
+// SyncOfflineActivity syncs offline activity by sending heartbeats
+// from the offline queue to the WakaTime API.
+func SyncOfflineActivity(ctx context.Context, v *viper.Viper, queueFilepath string) error {
+	paramAPI, err := params.LoadAPIParams(ctx, v)
+	if err != nil {
+		return fmt.Errorf("failed to load API parameters: %w", err)
 	}
 
-	// 在真实实现中，这将以受控速率从离线数据库同步心跳
-	// 这里我们只是记录同步行为
-	logger.Infof("将同步 %d 个离线心跳（受 %d 秒的速率限制）", syncCount, rateLimitSecs)
-	fmt.Printf("同步离线活动：%d 个心跳（受 %d 秒的速率限制）\n", syncCount, rateLimitSecs)
+	apiClient, err := cmdapi.NewClientWithoutAuth(ctx, paramAPI)
+	if err != nil {
+		return fmt.Errorf("failed to initialize api client: %w", err)
+	}
 
-	return exitcode.Success, nil
+	paramOffline := params.LoadOfflineParams(ctx, v)
+
+	handle := heartbeat.NewHandle(apiClient,
+		offline.WithSync(queueFilepath, paramOffline.SyncMax),
+		apikey.WithReplacing(apikey.Config{
+			DefaultAPIKey: paramAPI.Key,
+			MapPatterns:   paramAPI.KeyPatterns,
+		}),
+	)
+
+	_, err = handle(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	logger := log.Extract(ctx)
+
+	if err := cmdheartbeat.ResetRateLimit(ctx, v); err != nil {
+		logger.Errorf("failed to reset rate limit: %s", err)
+	}
+
+	return nil
+}
+
+// fileExists checks if a file or directory exist.
+func fileExists(fp string) bool {
+	_, err := os.Stat(fp)
+	return err == nil || os.IsExist(err)
 }

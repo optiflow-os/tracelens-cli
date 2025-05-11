@@ -3,177 +3,178 @@ package api
 import (
 	"fmt"
 
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"go.uber.org/zap/zapcore"
 )
 
-// Err 表示一个通用的 API 错误。
+// Err represents a general api error.
 type Err struct {
 	Err error
 }
 
-var _ utils.Error = Err{}
+var _ wakaerror.Error = Err{}
 
-// Error 方法实现错误接口。
+// Error method to implement error interface.
 func (e Err) Error() string {
 	return e.Err.Error()
 }
 
-// ExitCode 方法实现 wakaerror.Error 接口。
+// ExitCode method to implement wakaerror.Error interface.
 func (Err) ExitCode() int {
-	return utils.ErrAPI
+	return exitcode.ErrAPI
 }
 
-// Message 方法实现 wakaerror.Error 接口。
+// Message method to implement wakaerror.Error interface.
 func (e Err) Message() string {
 	return fmt.Sprintf("api error: %s", e.Err)
 }
 
-// SendDiagsOnErrors 方法实现 wakaerror.SendDiagsOnErrors 接口。
+// SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.
 func (Err) SendDiagsOnErrors() bool {
 	return false
 }
 
-// ShouldLogError 方法实现 wakaerror.ShouldLogError 接口。
+// ShouldLogError method to implement wakaerror.ShouldLogError interface.
 func (Err) ShouldLogError() bool {
 	return true
 }
 
-// ErrAuth 表示认证错误。
+// ErrAuth represents an authentication error.
 type ErrAuth struct {
 	Err error
 }
 
-var _ utils.Error = ErrAuth{}
+var _ wakaerror.Error = ErrAuth{}
 
-// Error 方法实现错误接口。
+// Error method to implement error interface.
 func (e ErrAuth) Error() string {
 	return e.Err.Error()
 }
 
-// ExitCode 方法实现 wakaerror.Error 接口。
+// ExitCode method to implement wakaerror.Error interface.
 func (ErrAuth) ExitCode() int {
-	return utils.ErrAuth
+	return exitcode.ErrAuth
 }
 
-// Message 方法实现 wakaerror.Error 接口。
+// Message method to implement wakaerror.Error interface.
 func (e ErrAuth) Message() string {
 	return fmt.Sprintf("invalid api key... find yours at wakatime.com/api-key. %s", e.Err.Error())
 }
 
-// SendDiagsOnErrors 方法实现 wakaerror.SendDiagsOnErrors 接口。
+// SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.
 func (ErrAuth) SendDiagsOnErrors() bool {
 	return false
 }
 
-// ShouldLogError 方法实现 wakaerror.ShouldLogError 接口。
+// ShouldLogError method to implement wakaerror.ShouldLogError interface.
 func (ErrAuth) ShouldLogError() bool {
 	return true
 }
 
-// ErrBadRequest 表示来自 API 的 400 响应。
+// ErrBadRequest represents a 400 response from the API.
 type ErrBadRequest struct {
 	Err error
 }
 
-var _ utils.Error = ErrBadRequest{}
+var _ wakaerror.Error = ErrBadRequest{}
 
-// Error 方法实现错误接口。
+// Error method to implement error interface.
 func (e ErrBadRequest) Error() string {
 	return e.Err.Error()
 }
 
-// ExitCode 方法实现 wakaerror.Error 接口。
+// ExitCode method to implement wakaerror.Error interface.
 func (ErrBadRequest) ExitCode() int {
-	return utils.ErrGeneric
+	return exitcode.ErrGeneric
 }
 
-// Message 方法实现 wakaerror.Error 接口。
+// Message method to implement wakaerror.Error interface.
 func (e ErrBadRequest) Message() string {
 	return fmt.Sprintf("bad request: %s", e.Err)
 }
 
-// SendDiagsOnErrors 方法实现 wakaerror.SendDiagsOnErrors 接口。
+// SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.
 func (ErrBadRequest) SendDiagsOnErrors() bool {
 	return false
 }
 
-// ShouldLogError 方法实现 wakaerror.ShouldLogError 接口。
+// ShouldLogError method to implement wakaerror.ShouldLogError interface.
 func (ErrBadRequest) ShouldLogError() bool {
 	return true
 }
 
-// ErrBackoff 表示因为当前被限速而稍后发送。
+// ErrBackoff means we send later because currently rate limited.
 type ErrBackoff struct {
 	Err error
 }
 
-var _ utils.Error = ErrBackoff{}
+var _ wakaerror.Error = ErrBackoff{}
 
-// Error 方法实现错误接口。
+// Error method to implement error interface.
 func (e ErrBackoff) Error() string {
 	return e.Err.Error()
 }
 
-// ExitCode 方法实现 wakaerror.Error 接口。
+// ExitCode method to implement wakaerror.Error interface.
 func (ErrBackoff) ExitCode() int {
-	return utils.ErrBackoff
+	return exitcode.ErrBackoff
 }
 
-// LogLevel 方法实现 wakaerror.LogLevel 接口。
+// LogLevel method to implement wakaerror.LogLevel interface.
 func (ErrBackoff) LogLevel() int8 {
 	return int8(zapcore.DebugLevel)
 }
 
-// Message 方法实现 wakaerror.Error 接口。
+// Message method to implement wakaerror.Error interface.
 func (e ErrBackoff) Message() string {
 	return fmt.Sprintf("rate limited: %s", e.Err)
 }
 
-// SendDiagsOnErrors 方法实现 wakaerror.SendDiagsOnErrors 接口。
+// SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.
 func (ErrBackoff) SendDiagsOnErrors() bool {
 	return false
 }
 
-// ShouldLogError 方法实现 wakaerror.ShouldLogError 接口。
+// ShouldLogError method to implement wakaerror.ShouldLogError interface.
 func (ErrBackoff) ShouldLogError() bool {
 	return false
 }
 
-// ErrTimeout 表示超时错误。
+// ErrTimeout represents a timeout error.
 type ErrTimeout struct {
 	Err error
 }
 
-var _ utils.Error = ErrTimeout{}
+var _ wakaerror.Error = ErrTimeout{}
 
-// Error 方法实现错误接口。
+// Error method to implement error interface.
 func (e ErrTimeout) Error() string {
 	return e.Err.Error()
 }
 
-// ExitCode 方法实现 wakaerror.Error 接口。
+// ExitCode method to implement wakaerror.Error interface.
 func (ErrTimeout) ExitCode() int {
-	return utils.ErrGeneric
+	return exitcode.ErrGeneric
 }
 
-// LogLevel 方法实现 wakaerror.LogLevel 接口。
+// LogLevel method to implement wakaerror.LogLevel interface.
 func (ErrTimeout) LogLevel() int8 {
 	return int8(zapcore.DebugLevel)
 }
 
-// Message 方法实现 wakaerror.Error 接口。
+// Message method to implement wakaerror.Error interface.
 func (e ErrTimeout) Message() string {
 	return fmt.Sprintf("timeout: %s", e.Err)
 }
 
-// SendDiagsOnErrors 方法实现 wakaerror.SendDiagsOnErrors 接口。
+// SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.
 func (ErrTimeout) SendDiagsOnErrors() bool {
 	return false
 }
 
-// ShouldLogError 方法实现 wakaerror.ShouldLogError 接口。
+// ShouldLogError method to implement wakaerror.ShouldLogError interface.
 func (ErrTimeout) ShouldLogError() bool {
 	return false
 }

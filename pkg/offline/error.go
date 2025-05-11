@@ -3,7 +3,8 @@ package offline
 import (
 	"fmt"
 
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
+	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 )
 
 // ErrOpenDB is an error returned when the database cannot be opened.
@@ -11,7 +12,7 @@ type ErrOpenDB struct {
 	Err error
 }
 
-var _ utils.Error = ErrOpenDB{}
+var _ wakaerror.Error = ErrOpenDB{}
 
 // Error method to implement error interface.
 func (e ErrOpenDB) Error() string {
@@ -26,7 +27,7 @@ func (e ErrOpenDB) Message() string {
 // ExitCode method to implement wakaerror.Error interface.
 func (ErrOpenDB) ExitCode() int {
 	// Despite the error, we don't want to exit with an error code.
-	return utils.Success
+	return exitcode.Success
 }
 
 // SendDiagsOnErrors method to implement wakaerror.SendDiagsOnErrors interface.

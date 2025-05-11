@@ -11,19 +11,28 @@ import (
 	offlinecmd "github.com/optiflow-os/tracelens-cli/cmd/offline"
 	paramscmd "github.com/optiflow-os/tracelens-cli/cmd/params"
 	"github.com/optiflow-os/tracelens-cli/pkg/api"
+	"github.com/optiflow-os/tracelens-cli/pkg/apikey"
+	"github.com/optiflow-os/tracelens-cli/pkg/backoff"
+	"github.com/optiflow-os/tracelens-cli/pkg/deps"
+	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/filestats"
+	"github.com/optiflow-os/tracelens-cli/pkg/filter"
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/pkg/ini"
+	"github.com/optiflow-os/tracelens-cli/pkg/language"
+	_ "github.com/optiflow-os/tracelens-cli/pkg/lexer" // force to load all lexers
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
-	"github.com/optiflow-os/tracelens-cli/pkg/utils"
-
+	"github.com/optiflow-os/tracelens-cli/pkg/project"
+	"github.com/optiflow-os/tracelens-cli/pkg/remote"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"github.com/spf13/viper"
 )
 
-// Run 处理心跳命令的执行。
+// Run executes the heartbeat command.
 func Run(ctx context.Context, v *viper.Viper) (int, error) {
 	logger := log.Extract(ctx)
-	logger.Debugln("handling heartbeat command")
 
 	queueFilepath, err := offline.QueueFilepath(ctx, v)
 	if err != nil {
@@ -44,11 +53,11 @@ func Run(ctx context.Context, v *viper.Viper) (int, error) {
 			return errauth.ExitCode(), fmt.Errorf("sending heartbeat(s) failed: %w", errauth)
 		}
 
-		if errwaka, ok := err.(utils.Error); ok {
+		if errwaka, ok := err.(wakaerror.Error); ok {
 			return errwaka.ExitCode(), fmt.Errorf("sending heartbeat(s) failed: %w", errwaka)
 		}
 
-		return utils.ErrGeneric, fmt.Errorf(
+		return exitcode.ErrGeneric, fmt.Errorf(
 			"sending heartbeat(s) failed: %w",
 			err,
 		)
@@ -56,10 +65,10 @@ func Run(ctx context.Context, v *viper.Viper) (int, error) {
 
 	logger.Debugln("successfully sent heartbeat(s)")
 
-	return utils.Success, nil
+	return exitcode.Success, nil
 }
 
-// SendHeartbeats sends a heartbeat to the tracelens api and includes additional
+// SendHeartbeats sends a heartbeat to the wakatime api and includes additional
 // heartbeats from the offline queue, if available and offline sync is not
 // explicitly disabled.
 func SendHeartbeats(ctx context.Context, v *viper.Viper, queueFilepath string) error {

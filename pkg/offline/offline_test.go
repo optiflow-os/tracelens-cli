@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
 	"github.com/optiflow-os/tracelens-cli/pkg/ini"
 	"github.com/optiflow-os/tracelens-cli/pkg/offline"
+	"github.com/spf13/viper"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

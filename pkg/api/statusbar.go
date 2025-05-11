@@ -10,11 +10,11 @@ import (
 	"github.com/optiflow-os/tracelens-cli/pkg/summary"
 )
 
-// Today 获取今天的代码统计数据。
+// Today fetches code stats for Today.
 //
-// 当无法从API接收到响应时，返回ErrRequest。
-// 当收到401未授权的API响应时，返回ErrAuth。
-// 任何其他API响应相关的错误都返回Err。
+// ErrRequest is returned upon request failure with no received response from api.
+// ErrAuth is returned upon receiving a 401 Unauthorized api response.
+// Err is returned on any other api response related error.
 func (c *Client) Today(ctx context.Context) (*summary.Summary, error) {
 	url := c.baseURL + "/users/current/statusbar/today"
 
@@ -64,7 +64,7 @@ func (c *Client) Today(ctx context.Context) (*summary.Summary, error) {
 	return summary, nil
 }
 
-// ParseStatusBarResponse 将API响应解析为summary.Summary。
+// ParseStatusBarResponse parses the wakatime api response into summary.Summary.
 func ParseStatusBarResponse(data []byte) (*summary.Summary, error) {
 	var body summary.Summary
 

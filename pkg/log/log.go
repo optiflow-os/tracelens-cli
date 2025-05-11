@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/optiflow-os/tracelens-cli/pkg/version"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/optiflow-os/tracelens-cli/pkg/version"
 )
 
 const (
-	// MaxLogFileSize 是日志文件的最大大小。
+	// MaxLogFileSize is the maximum size of the log file.
 	MaxLogFileSize = 25 // 25MB
-	// MaxNumberOfBackups 是日志文件备份的最大数量。
+	// MaxNumberOfBackups is the maximum number of log file backups.
 	MaxNumberOfBackups = 4
 )
 
-// Logger 是日志条目。
+// Logger is the log entry.
 type Logger struct {
 	entry              *zap.Logger
 	atomicLevel        zap.AtomicLevel
@@ -28,7 +28,7 @@ type Logger struct {
 	verbose            bool
 }
 
-// New 创建一个写入到 dest 的新 Logger。
+// New creates a new Logger that writes to dest.
 func New(dest io.Writer, opts ...Option) *Logger {
 	atom := zap.NewAtomicLevel()
 	dynamicWriteSyncer := NewDynamicWriteSyncer(zapcore.AddSync(dest))
@@ -68,33 +68,33 @@ func New(dest io.Writer, opts ...Option) *Logger {
 	return logger
 }
 
-// IsMetricsEnabled 如果应该收集指标，则返回 true。
+// IsMetricsEnabled returns true if it should collect metrics.
 func (l *Logger) IsMetricsEnabled() bool {
 	return l.metrics
 }
 
-// IsVerboseEnabled 如果启用了调试，则返回 true。
+// IsVerboseEnabled returns true if debug is enabled.
 func (l *Logger) IsVerboseEnabled() bool {
 	return l.verbose
 }
 
-// Output 返回当前日志输出。
+// Output returns the current log output.
 func (l *Logger) Output() io.Writer {
 	return l.currentOutput
 }
 
-// SendDiagsOnErrors 如果应该在出错时发送诊断信息，则返回 true。
+// SendDiagsOnErrors returns true if diagnostics should be sent on errors.
 func (l *Logger) SendDiagsOnErrors() bool {
 	return l.sendDiagsOnErrors
 }
 
-// SetOutput 定义将日志输出设置为 io.Writer。
+// SetOutput defines sets the log output to io.Writer.
 func (l *Logger) SetOutput(w io.Writer) {
 	l.currentOutput = w
 	l.dynamicWriteSyncer.SetWriter(zapcore.AddSync(w))
 }
 
-// SetVerbose 如果启用，则将日志级别设置为调试。
+// SetVerbose sets log level to debug if enabled.
 func (l *Logger) SetVerbose(verbose bool) {
 	l.verbose = verbose
 
@@ -105,7 +105,7 @@ func (l *Logger) SetVerbose(verbose bool) {
 	}
 }
 
-// Flush 刷新日志输出并关闭文件。
+// Flush flushes the log output and closes the file.
 func (l *Logger) Flush() {
 	if err := l.entry.Sync(); err != nil {
 		l.Debugf("failed to flush log file: %s", err)
@@ -118,67 +118,67 @@ func (l *Logger) Flush() {
 	}
 }
 
-// Log 在给定级别记录消息。
+// Log logs a message at the given level.
 func (l Logger) Log(level zapcore.Level, msg string) {
 	l.entry.Log(level, msg)
 }
 
-// Logf 在给定级别记录消息。
+// Logf logs a message at the given level.
 func (l Logger) Logf(level zapcore.Level, format string, args ...any) {
 	l.entry.Log(level, fmt.Sprintf(format, args...))
 }
 
-// Debugf 在 Debug 级别记录消息。
+// Debugf logs a message at level Debug.
 func (l *Logger) Debugf(format string, args ...any) {
 	l.entry.Log(zapcore.DebugLevel, fmt.Sprintf(format, args...))
 }
 
-// Infof 在 Info 级别记录消息。
+// Infof logs a message at level Info.
 func (l *Logger) Infof(format string, args ...any) {
 	l.entry.Log(zapcore.InfoLevel, fmt.Sprintf(format, args...))
 }
 
-// Warnf 在 Warn 级别记录消息。
+// Warnf logs a message at level Warn.
 func (l *Logger) Warnf(format string, args ...any) {
 	l.entry.Log(zapcore.WarnLevel, fmt.Sprintf(format, args...))
 }
 
-// Errorf 在 Error 级别记录消息。
+// Errorf logs a message at level Error.
 func (l *Logger) Errorf(format string, args ...any) {
 	l.entry.Log(zapcore.ErrorLevel, fmt.Sprintf(format, args...))
 }
 
-// Fatalf 在 Fatal 级别记录消息，然后进程将以状态 1 退出。
+// Fatalf logs a message at level Fatal then the process will exit with status set to 1.
 func (l *Logger) Fatalf(format string, args ...any) {
 	l.entry.Log(zapcore.FatalLevel, fmt.Sprintf(format, args...))
 }
 
-// Debugln 在 Debug 级别记录消息。
+// Debugln logs a message at level Debug.
 func (l *Logger) Debugln(msg string) {
 	l.entry.Log(zapcore.DebugLevel, msg)
 }
 
-// Infoln 在 Info 级别记录消息。
+// Infoln logs a message at level Info.
 func (l *Logger) Infoln(msg string) {
 	l.entry.Log(zapcore.InfoLevel, msg)
 }
 
-// Warnln 在 Warn 级别记录消息。
+// Warnln logs a message at level Warn.
 func (l *Logger) Warnln(msg string) {
 	l.entry.Log(zapcore.WarnLevel, msg)
 }
 
-// Errorln 在 Error 级别记录消息。
+// Errorln logs a message at level Error.
 func (l *Logger) Errorln(msg string) {
 	l.entry.Log(zapcore.ErrorLevel, msg)
 }
 
-// Fatalln 在 Fatal 级别记录消息，然后进程将以状态 1 退出。
+// Fatalln logs a message at level Fatal then the process will exit with status set to 1.
 func (l *Logger) Fatalln(msg string) {
 	l.entry.Log(zapcore.FatalLevel, msg)
 }
 
-// WithField 向 Logger 添加单个字段。
+// WithField adds a single field to the Logger.
 func (l *Logger) WithField(key string, value any) {
 	l.entry = l.entry.With(zap.Any(key, value))
 }

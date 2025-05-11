@@ -2,40 +2,73 @@ package configread
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
-	"github.com/optiflow-os/tracelens-cli/pkg/log"
 	"github.com/optiflow-os/tracelens-cli/pkg/vipertools"
 
 	"github.com/spf13/viper"
 )
 
-// Run 执行配置读取命令。
-func Run(ctx context.Context, v *viper.Viper) (int, error) {
-	logger := log.Extract(ctx)
-	logger.Debugln("执行配置读取命令")
+// Params contains config read parameters.
+type Params struct {
+	Section string
+	Key     string
+}
 
-	// 获取要读取的配置键
-	key := v.GetString("config-read")
-	if key == "" {
-		logger.Errorf("没有提供配置键")
-		return exitcode.ErrConfigFileRead, fmt.Errorf("没有提供配置键")
+// Run prints the value for the given config key.
+func Run(_ context.Context, v *viper.Viper) (int, error) {
+	output, err := Read(v)
+	if err != nil {
+		return exitcode.ErrConfigFileRead, fmt.Errorf(
+			"failed to read in config: %s",
+			err,
+		)
 	}
 
-	// 获取配置节
-	section := v.GetString("config-section")
-	if section != "" && section != "settings" {
-		// 添加节前缀
-		key = fmt.Sprintf("%s.%s", section, key)
-	}
-
-	// 读取配置值
-	value := vipertools.GetString(v, key)
-
-	// 输出配置值
-	fmt.Println(value)
-	logger.Debugf("已读取配置键 %s 的值：%s", key, value)
+	fmt.Println(output)
 
 	return exitcode.Success, nil
+}
+
+// Read returns the value for the given config key.
+func Read(v *viper.Viper) (string, error) {
+	params, err := LoadParams(v)
+	if err != nil {
+		return "", fmt.Errorf("failed to load command parameters: %w", err)
+	}
+
+	value := strings.TrimSpace(vipertools.GetString(v, params.ViperKey()))
+	if value == "" {
+		return "", fmt.Errorf(
+			"given section and key %q returned an empty string",
+			params.ViperKey(),
+		)
+	}
+
+	return value, nil
+}
+
+// LoadParams loads needed data from the configuration file.
+func LoadParams(v *viper.Viper) (Params, error) {
+	section := strings.TrimSpace(vipertools.GetString(v, "config-section"))
+	key := strings.TrimSpace(vipertools.GetString(v, "config-read"))
+
+	if section == "" || key == "" {
+		return Params{}, errors.New(
+			"failed reading wakatime config file. neither section nor key can be empty",
+		)
+	}
+
+	return Params{
+		Section: section,
+		Key:     key,
+	}, nil
+}
+
+// ViperKey formats to a string [section].[key].
+func (c *Params) ViperKey() string {
+	return fmt.Sprintf("%s.%s", c.Section, c.Key)
 }

@@ -1,15 +1,15 @@
 package version
 
-// 版本信息
+// nolint:gochecknoglobals
 var (
-	// Arch 指定 tracelens-cli 构建的 CPU 架构。
+	// Arch specifies the CPU architecture of the wakatime-cli build.
 	Arch = "unset"
-	// BuildDate 表示 tracelens-cli 构建的日期。
+	// BuildDate states the date of the wakatime-cli build.
 	BuildDate = "unset"
-	// Commit 表示 tracelens-cli 构建的提交。
+	// Commit states the commit of the wakatime-cli build.
 	Commit = "unset"
-	// OS 指定 tracelens-cli 构建的目标操作系统。
+	// OS specifies the target operating system of the wakatime-cli build.
 	OS = "unset"
-	// Version 表示 tracelens-cli 构建的版本。
+	// Version states the version of the wakatime-cli build.
 	Version = "unset"
 )

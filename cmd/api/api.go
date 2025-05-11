@@ -13,7 +13,8 @@ import (
 	tz "github.com/gandarez/go-olson-timezone"
 )
 
-// NewClient 根据传入的参数初始化一个带有所有选项的API客户端
+// NewClient initializes a new api client with all options following the
+// passed in parameters.
 func NewClient(ctx context.Context, params paramscmd.API) (*api.Client, error) {
 	withAuth, err := api.WithAuth(api.BasicAuth{
 		Secret: params.Key,
@@ -25,13 +26,13 @@ func NewClient(ctx context.Context, params paramscmd.API) (*api.Client, error) {
 	return newClient(ctx, params, withAuth)
 }
 
-// NewClientWithoutAuth 根据传入的参数初始化一个带有所有选项的API客户端，
-// 但禁用了身份验证
+// NewClientWithoutAuth initializes a new api client with all options following the
+// passed in parameters and disabled authentication.
 func NewClientWithoutAuth(ctx context.Context, params paramscmd.API) (*api.Client, error) {
 	return newClient(ctx, params)
 }
 
-// newClient 包含客户端初始化的逻辑，除了身份验证初始化
+// newClient contains the logic of client initialization, except auth initialization.
 func newClient(ctx context.Context, params paramscmd.API, opts ...api.Option) (*api.Client, error) {
 	opts = append(opts, api.WithTimeout(params.Timeout))
 	opts = append(opts, api.WithHostname(strings.TrimSpace(params.Hostname)))
@@ -83,7 +84,6 @@ func newClient(ctx context.Context, params paramscmd.API, opts ...api.Option) (*
 	return api.NewClient(params.URL, opts...), nil
 }
 
-// timezone 获取本地时区名称
 func timezone() (name string, err error) {
 	defer func() {
 		if r := recover(); r != nil {

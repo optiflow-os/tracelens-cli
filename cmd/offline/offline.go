@@ -2,62 +2,194 @@ package offline
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
+	paramscmd "github.com/optiflow-os/tracelens-cli/cmd/params"
+	"github.com/optiflow-os/tracelens-cli/pkg/deps"
+	"github.com/optiflow-os/tracelens-cli/pkg/filestats"
+	"github.com/optiflow-os/tracelens-cli/pkg/filter"
+	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
+	"github.com/optiflow-os/tracelens-cli/pkg/language"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
+	"github.com/optiflow-os/tracelens-cli/pkg/offline"
+	"github.com/optiflow-os/tracelens-cli/pkg/project"
+	"github.com/optiflow-os/tracelens-cli/pkg/remote"
+
 	"github.com/spf13/viper"
 )
 
-// Heartbeat 表示一个心跳数据结构。
-type Heartbeat struct {
-	Entity        string  `json:"entity"`
-	Type          string  `json:"type"`
-	Time          float64 `json:"time"`
-	Project       string  `json:"project,omitempty"`
-	Language      string  `json:"language,omitempty"`
-	IsWrite       bool    `json:"is_write,omitempty"`
-	LineAdditions int     `json:"line_additions,omitempty"`
-	LineDeletions int     `json:"line_deletions,omitempty"`
-}
+// SaveHeartbeats saves heartbeats to the offline db without trying to send to the API.
+// Used when we have more heartbeats than `offline.SendLimit`, when we couldn't send
+// heartbeats to the API, or the API returned an auth error.
+func SaveHeartbeats(ctx context.Context, v *viper.Viper, heartbeats []heartbeat.Heartbeat, queueFilepath string) error {
+	params, err := loadParams(ctx, v)
+	if err != nil {
+		return fmt.Errorf("failed to load command parameters: %w", err)
+	}
 
-// SaveHeartbeats 将心跳保存到离线队列。
-func SaveHeartbeats(ctx context.Context, v *viper.Viper, heartbeats []Heartbeat, queueFilepath string) error {
 	logger := log.Extract(ctx)
-	logger.Debugf("保存心跳到离线队列: %s", queueFilepath)
 
-	// 确保目录存在
-	dir := filepath.Dir(queueFilepath)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return fmt.Errorf("创建目录失败: %s", err)
+	setLogFields(ctx, params)
+	logger.Debugf("params: %s", params)
+
+	if params.Offline.Disabled {
+		return errors.New("saving to offline db disabled")
 	}
 
-	// 在实际实现中，这里会将心跳存储到 bolt 数据库
-	// 为简化起见，我们只将其写入 JSON 文件
-	if len(heartbeats) > 0 {
-		data, err := json.Marshal(heartbeats)
-		if err != nil {
-			return fmt.Errorf("序列化心跳失败: %s", err)
-		}
-
-		// 以追加模式打开文件
-		f, err := os.OpenFile(queueFilepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("打开队列文件失败: %s", err)
-		}
-		defer f.Close()
-
-		// 写入数据
-		if _, err := f.Write(data); err != nil {
-			return fmt.Errorf("写入心跳到队列文件失败: %s", err)
-		}
-
-		logger.Debugf("成功保存 %d 个心跳到离线队列", len(heartbeats))
-	} else {
-		logger.Debugln("没有心跳需要保存")
+	if heartbeats == nil {
+		// We're not saving surplus extra heartbeats, so save
+		// main heartbeat and all extra heartbeats to offline db
+		heartbeats = buildHeartbeats(ctx, params)
 	}
+
+	handleOpts := initHandleOptions(params)
+
+	handleOpts = append(handleOpts, offline.WithQueue(queueFilepath))
+
+	sender := offline.Noop{}
+	handle := heartbeat.NewHandle(sender, handleOpts...)
+
+	_, _ = handle(ctx, heartbeats)
 
 	return nil
+}
+
+func loadParams(ctx context.Context, v *viper.Viper) (paramscmd.Params, error) {
+	logger := log.Extract(ctx)
+
+	paramAPI, err := paramscmd.LoadAPIParams(ctx, v)
+	if err != nil {
+		logger.Warnf("failed to load API parameters: %s", err)
+	}
+
+	paramHeartbeat, err := paramscmd.LoadHeartbeatParams(ctx, v)
+	if err != nil {
+		return paramscmd.Params{}, fmt.Errorf("failed to load heartbeat parameters: %s", err)
+	}
+
+	return paramscmd.Params{
+		API:       paramAPI,
+		Heartbeat: paramHeartbeat,
+		Offline:   paramscmd.LoadOfflineParams(ctx, v),
+	}, nil
+}
+
+func buildHeartbeats(ctx context.Context, params paramscmd.Params) []heartbeat.Heartbeat {
+	heartbeats := []heartbeat.Heartbeat{}
+
+	userAgent := heartbeat.UserAgent(ctx, params.API.Plugin)
+
+	heartbeats = append(heartbeats, heartbeat.New(
+		params.Heartbeat.Project.BranchAlternate,
+		params.Heartbeat.Category,
+		params.Heartbeat.CursorPosition,
+		params.Heartbeat.Entity,
+		params.Heartbeat.EntityType,
+		params.Heartbeat.IsUnsavedEntity,
+		params.Heartbeat.IsWrite,
+		params.Heartbeat.Language,
+		params.Heartbeat.LanguageAlternate,
+		params.Heartbeat.LineAdditions,
+		params.Heartbeat.LineDeletions,
+		params.Heartbeat.LineNumber,
+		params.Heartbeat.LinesInFile,
+		params.Heartbeat.LocalFile,
+		params.Heartbeat.Project.Alternate,
+		params.Heartbeat.Project.ProjectFromGitRemote,
+		params.Heartbeat.Project.Override,
+		params.Heartbeat.Sanitize.ProjectPathOverride,
+		params.Heartbeat.Time,
+		userAgent,
+	))
+
+	if len(params.Heartbeat.ExtraHeartbeats) > 0 {
+		logger := log.Extract(ctx)
+		logger.Debugf("include %d extra heartbeat(s) from stdin", len(params.Heartbeat.ExtraHeartbeats))
+
+		for _, h := range params.Heartbeat.ExtraHeartbeats {
+			heartbeats = append(heartbeats, heartbeat.New(
+				h.BranchAlternate,
+				h.Category,
+				h.CursorPosition,
+				h.Entity,
+				h.EntityType,
+				h.IsUnsavedEntity,
+				h.IsWrite,
+				h.Language,
+				h.LanguageAlternate,
+				h.LineAdditions,
+				h.LineDeletions,
+				h.LineNumber,
+				h.Lines,
+				h.LocalFile,
+				h.ProjectAlternate,
+				h.ProjectFromGitRemote,
+				h.ProjectOverride,
+				h.ProjectPathOverride,
+				h.Time,
+				userAgent,
+			))
+		}
+	}
+
+	return heartbeats
+}
+
+func initHandleOptions(params paramscmd.Params) []heartbeat.HandleOption {
+	return []heartbeat.HandleOption{
+		heartbeat.WithFormatting(),
+		heartbeat.WithEntityModifier(),
+		filter.WithFiltering(filter.Config{
+			Exclude:                    params.Heartbeat.Filter.Exclude,
+			Include:                    params.Heartbeat.Filter.Include,
+			IncludeOnlyWithProjectFile: params.Heartbeat.Filter.IncludeOnlyWithProjectFile,
+		}),
+		remote.WithDetection(),
+		filestats.WithDetection(),
+		language.WithDetection(language.Config{
+			GuessLanguage: params.Heartbeat.GuessLanguage,
+		}),
+		deps.WithDetection(deps.Config{
+			FilePatterns: params.Heartbeat.Sanitize.HideFileNames,
+		}),
+		project.WithDetection(project.Config{
+			HideProjectNames:     params.Heartbeat.Sanitize.HideProjectNames,
+			MapPatterns:          params.Heartbeat.Project.MapPatterns,
+			ProjectFromGitRemote: params.Heartbeat.Project.ProjectFromGitRemote,
+			Submodule: project.Submodule{
+				DisabledPatterns: params.Heartbeat.Project.SubmodulesDisabled,
+				MapPatterns:      params.Heartbeat.Project.SubmoduleMapPatterns,
+			},
+		}),
+		project.WithFiltering(project.FilterConfig{
+			ExcludeUnknownProject: params.Heartbeat.Filter.ExcludeUnknownProject,
+		}),
+		heartbeat.WithSanitization(heartbeat.SanitizeConfig{
+			BranchPatterns:     params.Heartbeat.Sanitize.HideBranchNames,
+			DependencyPatterns: params.Heartbeat.Sanitize.HideDependencies,
+			FilePatterns:       params.Heartbeat.Sanitize.HideFileNames,
+			HideProjectFolder:  params.Heartbeat.Sanitize.HideProjectFolder,
+			ProjectPatterns:    params.Heartbeat.Sanitize.HideProjectNames,
+		}),
+		remote.WithCleanup(),
+		filter.WithLengthValidator(),
+	}
+}
+
+func setLogFields(ctx context.Context, params paramscmd.Params) {
+	log.AddField(ctx, "file", params.Heartbeat.Entity)
+	log.AddField(ctx, "time", params.Heartbeat.Time)
+
+	if params.API.Plugin != "" {
+		log.AddField(ctx, "plugin", params.API.Plugin)
+	}
+
+	if params.Heartbeat.LineNumber != nil {
+		log.AddField(ctx, "lineno", params.Heartbeat.LineNumber)
+	}
+
+	if params.Heartbeat.IsWrite != nil {
+		log.AddField(ctx, "is_write", params.Heartbeat.IsWrite)
+	}
 }

@@ -3,61 +3,101 @@ package todaygoal
 import (
 	"context"
 	"fmt"
-	"time"
+	"regexp"
 
+	cmdapi "github.com/optiflow-os/tracelens-cli/cmd/api"
+	"github.com/optiflow-os/tracelens-cli/cmd/params"
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/goal"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
+	"github.com/optiflow-os/tracelens-cli/pkg/output"
+	"github.com/optiflow-os/tracelens-cli/pkg/vipertools"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"github.com/spf13/viper"
 )
 
-// Run 执行今日目标命令。
+var uuid4Regex = regexp.MustCompile("^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$") // nolint
+
+// Params contains today-goal command parameters.
+type Params struct {
+	GoalID string
+	Output output.Output
+	API    params.API
+}
+
+// Run executes the today-goal command.
 func Run(ctx context.Context, v *viper.Viper) (int, error) {
+	output, err := Goal(ctx, v)
+	if err != nil {
+		if errwaka, ok := err.(wakaerror.Error); ok {
+			return errwaka.ExitCode(), fmt.Errorf("today goal fetch failed: %s", errwaka.Message())
+		}
+
+		return exitcode.ErrGeneric, fmt.Errorf(
+			"today goal fetch failed: %s",
+			err,
+		)
+	}
+
 	logger := log.Extract(ctx)
-	logger.Debugln("执行今日目标命令")
 
-	// 获取目标 ID
-	goalID := v.GetString("today-goal")
-	if goalID == "" {
-		logger.Errorf("没有提供目标 ID")
-		return exitcode.ErrGeneric, fmt.Errorf("没有提供目标 ID")
-	}
-
-	// 在真实实现中，这将从 API 获取目标进度
-	// 这里我们使用模拟数据进行演示
-	totalSecondsToday := 10800 // 模拟值：今天的编码时间（3小时）
-	goalSeconds := 14400       // 模拟值：目标编码时间（4小时）
-
-	// 计算完成百分比
-	percentComplete := float64(totalSecondsToday) / float64(goalSeconds) * 100
-
-	// 计算剩余时间
-	remainingSeconds := goalSeconds - totalSecondsToday
-	if remainingSeconds < 0 {
-		remainingSeconds = 0
-	}
-
-	// 格式化为小时和分钟
-	todayHours := totalSecondsToday / 3600
-	todayMinutes := (totalSecondsToday % 3600) / 60
-
-	remainingHours := remainingSeconds / 3600
-	remainingMinutes := (remainingSeconds % 3600) / 60
-
-	goalHours := goalSeconds / 3600
-	goalMinutes := (goalSeconds % 3600) / 60
-
-	// 输出目标进度信息
-	currentDate := time.Now().Format("2006年01月02日")
-	fmt.Printf("%s 的目标进度 (ID: %s)\n", currentDate, goalID)
-	fmt.Printf("目标: %d 小时 %d 分钟\n", goalHours, goalMinutes)
-	fmt.Printf("已完成: %d 小时 %d 分钟 (%.1f%%)\n", todayHours, todayMinutes, percentComplete)
-
-	if remainingSeconds > 0 {
-		fmt.Printf("剩余: %d 小时 %d 分钟\n", remainingHours, remainingMinutes)
-	} else {
-		fmt.Println("目标已完成！")
-	}
+	logger.Debugln("successfully fetched today goal")
+	fmt.Println(output)
 
 	return exitcode.Success, nil
+}
+
+// Goal returns total time of given goal id for today's coding activity.
+func Goal(ctx context.Context, v *viper.Viper) (string, error) {
+	params, err := LoadParams(ctx, v)
+	if err != nil {
+		return "", fmt.Errorf("failed to load command parameters: %w", err)
+	}
+
+	apiClient, err := cmdapi.NewClient(ctx, params.API)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize api client: %w", err)
+	}
+
+	g, err := apiClient.Goal(ctx, params.GoalID)
+	if err != nil {
+		return "", fmt.Errorf("failed fetching todays goal from api: %w", err)
+	}
+
+	output, err := goal.RenderToday(g, params.Output)
+	if err != nil {
+		return "", fmt.Errorf("failed generating today output: %s", err)
+	}
+
+	return output, nil
+}
+
+// LoadParams loads todaygoal config params from viper.Viper instance. Returns ErrAuth
+// if failed to retrieve api key.
+func LoadParams(ctx context.Context, v *viper.Viper) (Params, error) {
+	paramAPI, err := params.LoadAPIParams(ctx, v)
+	if err != nil {
+		return Params{}, fmt.Errorf("failed to load API parameters: %w", err)
+	}
+
+	paramStatusBar, err := params.LoadStatusBarParams(v)
+	if err != nil {
+		return Params{}, fmt.Errorf("failed to load status bar parameters: %w", err)
+	}
+
+	if !v.IsSet("today-goal") {
+		return Params{}, fmt.Errorf("goal id unset")
+	}
+
+	goalID := vipertools.GetString(v, "today-goal")
+	if !uuid4Regex.Match([]byte(goalID)) {
+		return Params{}, fmt.Errorf("goal id invalid")
+	}
+
+	return Params{
+		GoalID: goalID,
+		Output: paramStatusBar.Output,
+		API:    paramAPI,
+	}, nil
 }

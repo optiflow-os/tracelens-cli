@@ -2,88 +2,142 @@ package fileexperts
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	apicmd "github.com/optiflow-os/tracelens-cli/cmd/api"
+	paramscmd "github.com/optiflow-os/tracelens-cli/cmd/params"
+	"github.com/optiflow-os/tracelens-cli/pkg/apikey"
 	"github.com/optiflow-os/tracelens-cli/pkg/exitcode"
+	"github.com/optiflow-os/tracelens-cli/pkg/fileexperts"
+	"github.com/optiflow-os/tracelens-cli/pkg/filter"
+	"github.com/optiflow-os/tracelens-cli/pkg/heartbeat"
 	"github.com/optiflow-os/tracelens-cli/pkg/log"
+	"github.com/optiflow-os/tracelens-cli/pkg/project"
+	"github.com/optiflow-os/tracelens-cli/pkg/wakaerror"
 
 	"github.com/spf13/viper"
 )
 
-// FileExpert 表示文件专家信息。
-type FileExpert struct {
-	Name       string  `json:"name"`
-	Email      string  `json:"email"`
-	TotalTime  int     `json:"total_time"`
-	Percentage float64 `json:"percentage"`
-}
-
-// Run 执行文件专家命令。
+// Run executes the file-experts command.
 func Run(ctx context.Context, v *viper.Viper) (int, error) {
+	output, err := FileExperts(ctx, v)
+	if err != nil {
+		if errwaka, ok := err.(wakaerror.Error); ok {
+			return errwaka.ExitCode(), fmt.Errorf("file experts fetch failed: %s", errwaka.Message())
+		}
+
+		return exitcode.ErrGeneric, fmt.Errorf(
+			"file experts fetch failed: %s",
+			err,
+		)
+	}
+
 	logger := log.Extract(ctx)
-	logger.Debugln("执行文件专家命令")
+	logger.Debugln("successfully fetched file experts")
 
-	// 获取实体路径
-	entity := v.GetString("entity")
-	if entity == "" {
-		logger.Errorf("没有提供文件路径")
-		return exitcode.ErrGeneric, fmt.Errorf("没有提供文件路径")
-	}
-
-	// 在真实实现中，这将从 API 获取文件专家信息
-	// 这里我们使用模拟数据进行演示
-	experts := []FileExpert{
-		{
-			Name:       "张三",
-			Email:      "zhangsan@example.com",
-			TotalTime:  45000, // 12.5 小时
-			Percentage: 65.0,
-		},
-		{
-			Name:       "李四",
-			Email:      "lisi@example.com",
-			TotalTime:  18000, // 5 小时
-			Percentage: 25.0,
-		},
-		{
-			Name:       "王五",
-			Email:      "wangwu@example.com",
-			TotalTime:  7200, // 2 小时
-			Percentage: 10.0,
-		},
-	}
-
-	// 确定输出格式
-	outputFormat := v.GetString("output")
-
-	// 根据输出格式输出结果
-	switch outputFormat {
-	case "json", "raw-json":
-		data, err := json.MarshalIndent(experts, "", "  ")
-		if err != nil {
-			logger.Errorf("序列化专家数据失败: %s", err)
-			return exitcode.ErrGeneric, fmt.Errorf("序列化专家数据失败: %s", err)
-		}
-		fmt.Println(string(data))
-	default:
-		// 以文本形式输出
-		fmt.Printf("文件: %s 的专家\n\n", entity)
-		fmt.Println("姓名\t\t邮箱\t\t\t\t时间\t\t百分比")
-		fmt.Println("------------------------------------------------------------")
-
-		for _, expert := range experts {
-			hours := expert.TotalTime / 3600
-			minutes := (expert.TotalTime % 3600) / 60
-
-			fmt.Printf("%s\t\t%s\t\t%d小时%d分钟\t%.1f%%\n",
-				expert.Name,
-				expert.Email,
-				hours,
-				minutes,
-				expert.Percentage)
-		}
-	}
+	fmt.Println(output)
 
 	return exitcode.Success, nil
+}
+
+// FileExperts returns a rendered file experts of todays coding activity.
+func FileExperts(ctx context.Context, v *viper.Viper) (string, error) {
+	params, err := LoadParams(ctx, v)
+	if err != nil {
+		return "", fmt.Errorf("failed to load command parameters: %w", err)
+	}
+
+	handleOpts := initHandleOptions(params)
+
+	apiClient, err := apicmd.NewClientWithoutAuth(ctx, params.API)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize api client: %w", err)
+	}
+
+	handle := fileexperts.NewHandle(apiClient, handleOpts...)
+
+	results, err := handle(ctx, []heartbeat.Heartbeat{{Entity: params.Heartbeat.Entity}})
+	if err != nil {
+		return "", err
+	}
+
+	if len(results) == 0 {
+		return "", nil
+	}
+
+	output, err := fileexperts.RenderFileExperts(
+		results[0].FileExpert.(*fileexperts.FileExperts),
+		params.StatusBar.Output,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed generating fileexpert output: %s", err)
+	}
+
+	return output, nil
+}
+
+// LoadParams loads file-expert config params from viper.Viper instance. Returns ErrAuth
+// if failed to retrieve api key.
+func LoadParams(ctx context.Context, v *viper.Viper) (paramscmd.Params, error) {
+	if v == nil {
+		return paramscmd.Params{}, fmt.Errorf("viper instance unset")
+	}
+
+	heartbeatParams, err := paramscmd.LoadHeartbeatParams(ctx, v)
+	if err != nil {
+		return paramscmd.Params{}, fmt.Errorf("failed to load heartbeat params: %s", err)
+	}
+
+	apiParams, err := paramscmd.LoadAPIParams(ctx, v)
+	if err != nil {
+		return paramscmd.Params{}, fmt.Errorf("failed to load API parameters: %w", err)
+	}
+
+	statusBarParams, err := paramscmd.LoadStatusBarParams(v)
+	if err != nil {
+		return paramscmd.Params{}, fmt.Errorf("failed to load status bar params: %w", err)
+	}
+
+	return paramscmd.Params{
+		API:       apiParams,
+		Heartbeat: heartbeatParams,
+		StatusBar: statusBarParams,
+	}, nil
+}
+
+func initHandleOptions(params paramscmd.Params) []heartbeat.HandleOption {
+	return []heartbeat.HandleOption{
+		heartbeat.WithFormatting(),
+		heartbeat.WithEntityModifier(),
+		filter.WithFiltering(filter.Config{
+			Exclude:                    params.Heartbeat.Filter.Exclude,
+			Include:                    params.Heartbeat.Filter.Include,
+			IncludeOnlyWithProjectFile: params.Heartbeat.Filter.IncludeOnlyWithProjectFile,
+		}),
+		apikey.WithReplacing(apikey.Config{
+			DefaultAPIKey: params.API.Key,
+			MapPatterns:   params.API.KeyPatterns,
+		}),
+		project.WithDetection(project.Config{
+			HideProjectNames:     params.Heartbeat.Sanitize.HideProjectNames,
+			MapPatterns:          params.Heartbeat.Project.MapPatterns,
+			ProjectFromGitRemote: params.Heartbeat.Project.ProjectFromGitRemote,
+			Submodule: project.Submodule{
+				DisabledPatterns: params.Heartbeat.Project.SubmodulesDisabled,
+				MapPatterns:      params.Heartbeat.Project.SubmoduleMapPatterns,
+			},
+		}),
+		project.WithFiltering(project.FilterConfig{
+			ExcludeUnknownProject: params.Heartbeat.Filter.ExcludeUnknownProject,
+		}),
+		heartbeat.WithSanitization(heartbeat.SanitizeConfig{
+			BranchPatterns:     params.Heartbeat.Sanitize.HideBranchNames,
+			DependencyPatterns: params.Heartbeat.Sanitize.HideDependencies,
+			FilePatterns:       params.Heartbeat.Sanitize.HideFileNames,
+			HideProjectFolder:  params.Heartbeat.Sanitize.HideProjectFolder,
+			ProjectPatterns:    params.Heartbeat.Sanitize.HideProjectNames,
+		}),
+		fileexperts.WithValidation(),
+		filter.WithLengthValidator(),
+	}
 }

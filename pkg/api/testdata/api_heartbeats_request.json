@@ -9,16 +9,16 @@
 		"language": "Go",
 		"lineno": 42,
 		"lines": 100,
-		"project": "tracelens-cli",
+		"project": "wakatime-cli",
 		"type": "file",
 		"time": 1585598059,
-		"user_agent": "tracelens/1.0.6"
+		"user_agent": "wakatime/13.0.6"
 	},
 	{
 		"category": "debugging",
 		"entity": "HIDDEN.py",		
 		"type": "file",
 		"time": 1585598060,
-		"user_agent": "tracelens/1.0.7"
+		"user_agent": "wakatime/13.0.7"
 	}
 ]

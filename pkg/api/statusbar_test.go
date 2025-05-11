@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wakatime/wakatime-cli/pkg/api"
-	"github.com/wakatime/wakatime-cli/pkg/summary"
+	"github.com/optiflow-os/tracelens-cli/pkg/api"
+	"github.com/optiflow-os/tracelens-cli/pkg/summary"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

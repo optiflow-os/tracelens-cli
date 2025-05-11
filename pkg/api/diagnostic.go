@@ -24,7 +24,7 @@ type diagnosticsBody struct {
 	Stack         string `json:"stacktrace,omitempty"`
 }
 
-// SendDiagnostics 发送诊断信息到 TraceLens API。
+// SendDiagnostics sends diagnostics to the WakaTime api.
 func (c *Client) SendDiagnostics(
 	ctx context.Context,
 	plugin string,
