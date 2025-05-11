@@ -1,5 +1,3 @@
-//go:build integration
-
 package main_test
 
 import (
@@ -41,7 +39,7 @@ func TestSendHeartbeats(t *testing.T) {
 	projectFolder, err := filepath.Abs(".")
 	require.NoError(t, err)
 
-	testSendHeartbeats(t, projectFolder, "testdata/main.go", "wakatime-cli")
+	testSendHeartbeats(t, projectFolder, "testdata/main.go", "tracelens-cli")
 }
 
 func TestSendHeartbeats_EntityFileInTempDir(t *testing.T) {
@@ -119,17 +117,17 @@ func testSendHeartbeats(t *testing.T, projectFolder, entity, p string) {
 	// close the file to avoid "The process cannot access the file because it is being used by another process" error
 	offlineQueueFileLegacy.Close()
 
-	tmpConfigFile, err := os.CreateTemp(tmpDir, "wakatime.cfg")
+	tmpConfigFile, err := os.CreateTemp(tmpDir, "tracelens.cfg")
 	require.NoError(t, err)
 
 	defer tmpConfigFile.Close()
 
-	tmpInternalConfigFile, err := os.CreateTemp(tmpDir, "wakatime-internal.cfg")
+	tmpInternalConfigFile, err := os.CreateTemp(tmpDir, "tracelens-internal.cfg")
 	require.NoError(t, err)
 
 	defer tmpInternalConfigFile.Close()
 
-	runWakatimeCli(
+	runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--api-url", apiURL,
@@ -224,7 +222,7 @@ func TestSendHeartbeats_SecondaryApiKey(t *testing.T) {
 
 	defer tmpInternalConfigFile.Close()
 
-	runWakatimeCli(
+	runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--api-url", apiURL,
@@ -405,7 +403,7 @@ func TestSendHeartbeats_ExtraHeartbeats(t *testing.T) {
 
 	buffer := bytes.NewBuffer(data)
 
-	runWakatimeCli(
+	runTraceLensCli(
 		t,
 		buffer,
 		"--api-url", apiURL,
@@ -533,7 +531,7 @@ func TestSendHeartbeats_ExtraHeartbeats_SyncLegacyOfflineActivity(t *testing.T) 
 
 	buffer := bytes.NewBuffer(data)
 
-	runWakatimeCli(
+	runTraceLensCli(
 		t,
 		buffer,
 		"--api-url", apiURL,
@@ -871,7 +869,7 @@ func TestFileExperts(t *testing.T) {
 
 	defer tmpInternalConfigFile.Close()
 
-	out := runWakatimeCli(
+	out := runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--api-url", apiURL,
@@ -927,7 +925,7 @@ func TestTodayGoal(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-	out := runWakatimeCli(
+	out := runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--api-url", apiURL,
@@ -981,7 +979,7 @@ func TestTodaySummary(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	out := runWakatimeCli(
+	out := runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--api-url", apiURL,
@@ -1050,7 +1048,7 @@ func TestOfflineCount(t *testing.T) {
 
 	assert.Empty(t, out)
 
-	out = runWakatimeCli(
+	out = runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--key", "00000000-0000-4000-8000-000000000000",
@@ -1078,7 +1076,7 @@ func TestOfflineCountEmpty(t *testing.T) {
 
 	defer offlineQueueFileLegacy.Close()
 
-	out := runWakatimeCli(
+	out := runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--key", "00000000-0000-4000-8000-000000000000",
@@ -1148,7 +1146,7 @@ func TestPrintOfflineHeartbeats(t *testing.T) {
 
 	assert.Empty(t, out)
 
-	out = runWakatimeCli(
+	out = runTraceLensCli(
 		t,
 		&bytes.Buffer{},
 		"--key", "00000000-0000-4000-8000-000000000000",
@@ -1183,24 +1181,24 @@ func TestPrintOfflineHeartbeats(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	out := runWakatimeCli(t, &bytes.Buffer{}, "--user-agent")
+	out := runTraceLensCli(t, &bytes.Buffer{}, "--user-agent")
 	assert.Equal(t, fmt.Sprintf("%s\n", heartbeat.UserAgent(context.Background(), "")), out)
 }
 
 func TestUserAgentWithPlugin(t *testing.T) {
-	out := runWakatimeCli(t, &bytes.Buffer{}, "--user-agent", "--plugin", "Wakatime/1.0.4")
+	out := runTraceLensCli(t, &bytes.Buffer{}, "--user-agent", "--plugin", "Wakatime/1.0.4")
 
 	assert.Equal(t, fmt.Sprintf("%s\n", heartbeat.UserAgent(context.Background(), "Wakatime/1.0.4")), out)
 }
 
 func TestVersion(t *testing.T) {
-	out := runWakatimeCli(t, &bytes.Buffer{}, "--version")
+	out := runTraceLensCli(t, &bytes.Buffer{}, "--version")
 
 	assert.Equal(t, "<local-build>\n", out)
 }
 
 func TestVersionVerbose(t *testing.T) {
-	out := runWakatimeCli(t, &bytes.Buffer{}, "--version", "--verbose")
+	out := runTraceLensCli(t, &bytes.Buffer{}, "--version", "--verbose")
 
 	assert.Regexp(t, regexp.MustCompile(fmt.Sprintf(
 		"wakatime-cli\n  Version: <local-build>\n  Commit: [0-9a-f]{7}\n  Built: [0-9-:T]{19} UTC\n  OS/Arch: %s/%s\n",
@@ -1223,7 +1221,7 @@ func TestMultipleRunners(t *testing.T) {
 		go func(filepath string) {
 			defer wg.Done()
 
-			out := runWakatimeCli(
+			out := runTraceLensCli(
 				t,
 				&bytes.Buffer{},
 				"--config", filepath,
@@ -1238,7 +1236,7 @@ func TestMultipleRunners(t *testing.T) {
 }
 
 func binaryPath(t *testing.T) string {
-	filename := fmt.Sprintf("./build/wakatime-cli-%s-%s", runtime.GOOS, runtime.GOARCH)
+	filename := fmt.Sprintf("./build/tracelens-cli-%s-%s", runtime.GOOS, runtime.GOARCH)
 
 	switch runtime.GOOS {
 	case "darwin", "linux", "freebsd", "netbsd", "openbsd":
@@ -1251,7 +1249,7 @@ func binaryPath(t *testing.T) string {
 	}
 }
 
-func runWakatimeCli(t *testing.T, buffer *bytes.Buffer, args ...string) string {
+func runTraceLensCli(t *testing.T, buffer *bytes.Buffer, args ...string) string {
 	f, err := os.CreateTemp(t.TempDir(), "")
 	require.NoError(t, err)
 
@@ -1267,7 +1265,8 @@ func runWakatimeCli(t *testing.T, buffer *bytes.Buffer, args ...string) string {
 
 	args = append([]string{"--log-file", f.Name()}, args...)
 
-	return runCmd(exec.Command(binaryPath(t), args...), buffer) // #nosec G204
+	res := runCmd(exec.Command(binaryPath(t), args...), buffer)
+	return res
 }
 
 func runWakatimeCliExpectErr(t *testing.T, exitcode int, args ...string) string {
@@ -1293,6 +1292,7 @@ func runWakatimeCliExpectErr(t *testing.T, exitcode int, args ...string) string 
 	return stdout
 }
 
+// runCmd 执行一个命令并返回输出
 func runCmd(cmd *exec.Cmd, buffer *bytes.Buffer) string {
 	fmt.Println(cmd.String())
 
